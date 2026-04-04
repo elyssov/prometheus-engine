@@ -1,0 +1,15 @@
+[package]
+name = "prometheus-engine"
+version = "0.1.0"
+edition = "2021"
+description = "Voxel engine with full destructibility and GPU raymarching"
+authors = ["Eugene Lyssovsky", "Lara (AI)"]
+
+[dependencies]
+wgpu = "24"
+winit = "30"
+pollster = "0.4"
+bytemuck = { version = "1", features = ["derive"] }
+glam = "0.29"
+log = "0.4"
+env_logger = "0.11"
