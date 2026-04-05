@@ -7,3 +7,4 @@ pub mod procgen;
 pub mod svo;
 pub mod streaming;
 pub mod backend;
+pub mod meshing;
