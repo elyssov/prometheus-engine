@@ -1,0 +1,65 @@
+PROMETHEUS ENGINE LICENSE v1.0
+Copyright (c) 2026 Eugene Lyssovsky
+All rights reserved.
+
+TERMS AND CONDITIONS
+
+1. DEFINITIONS
+   "Engine" means the Prometheus Engine software, including source code,
+   documentation, assets, and associated files.
+   "Commercial Use" means use in any product or service that generates revenue.
+   "Revenue" means gross income from sales, subscriptions, advertisements,
+   or any other monetization of products built with the Engine.
+   "Derivative Engine" means any software that incorporates substantial
+   portions of the Engine's architecture, algorithms, or design patterns
+   for the purpose of creating a competing game engine.
+
+2. GRANT OF LICENSE
+   Subject to the terms of this License, the authors grant you a
+   non-exclusive, non-transferable, revocable license to:
+   a) View, study, and modify the source code
+   b) Build and distribute products using the Engine
+   c) Contribute improvements back to the Engine
+
+3. FREE USE
+   The Engine is free to use for:
+   a) Personal and educational projects
+   b) Open-source projects (with attribution)
+   c) Commercial projects with total lifetime Revenue below $100,000 USD
+
+4. COMMERCIAL ROYALTY
+   For Commercial Use generating Revenue exceeding $100,000 USD:
+   a) A royalty of 5% of Revenue exceeding $100,000 is due to the authors
+   b) Royalties are payable quarterly
+   c) You must register your commercial project with the authors
+
+5. ATTRIBUTION
+   All products built with the Engine must include the attribution:
+   "Powered by Prometheus Engine" in splash screen, credits, or about page.
+
+6. RESTRICTIONS
+   You may NOT, without prior written agreement from the authors:
+   a) Create or distribute a Derivative Engine
+   b) Use the Engine's architectural concepts, algorithms, or innovations
+      (as documented in PATENTS_AND_INNOVATIONS.md) in competing products
+   c) Sublicense, sell, or redistribute the Engine as a standalone product
+   d) Remove or alter copyright notices or license terms
+   e) Use the Engine in products that promote violence against real persons,
+      child exploitation, or illegal activities
+
+7. CONTRIBUTIONS
+   Contributions to the Engine are welcome. By contributing, you agree that
+   your contributions become part of the Engine under this License.
+
+8. TERMINATION
+   This License terminates automatically if you violate any of its terms.
+   Upon termination, you must cease all use and destroy all copies.
+
+9. DISCLAIMER
+   THE ENGINE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+   THE AUTHORS ARE NOT LIABLE FOR ANY DAMAGES ARISING FROM USE.
+
+10. GOVERNING LAW
+    This License is governed by international copyright law.
+
+For licensing inquiries: github.com/elyssov/prometheus-engine
