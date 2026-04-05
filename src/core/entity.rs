@@ -153,7 +153,8 @@ impl Entity {
     /// Create an ORPP soldier entity with weapon
     pub fn orpp_soldier(scale: f32) -> Self {
         let sk = Skeleton::human(scale);
-        let body = BodyDefinition::human_soldier(&sk, scale);
+        let mut body = BodyDefinition::human_soldier(&sk, scale);
+        body.set_hollow(true); // shell-only rendering for high-res grids
         let hand_id = sk.bone("hand_r").id;
 
         let mut entity = Entity::new("ORPP Soldier", sk, body);

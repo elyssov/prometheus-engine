@@ -16,7 +16,7 @@ use winit::{
     window::Window,
 };
 
-const GRID: usize = 256;
+const GRID: usize = 256; // Max for flat array with wgpu 256MB buffer limit. SVO needed for 512+
 const TOTAL: usize = GRID * GRID * GRID;
 
 #[repr(C)]

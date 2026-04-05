@@ -4,3 +4,5 @@ pub mod ik;
 pub mod attachment;
 pub mod entity;
 pub mod procgen;
+pub mod svo;
+pub mod streaming;

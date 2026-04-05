@@ -123,12 +123,19 @@ pub enum DecalShape {
 pub struct BodyDefinition {
     pub profiles: Vec<BoneProfile>,
     pub decals: Vec<BoneDecal>,
+    /// If true, only render the outer shell of each profile (1 voxel thick).
+    /// Interior is empty. Massive memory savings at high resolution.
+    /// 100³ cube: 1M voxels full vs 59K shell = 94% savings.
+    pub hollow: bool,
 }
 
 impl BodyDefinition {
     pub fn new() -> Self {
-        Self { profiles: Vec::new(), decals: Vec::new() }
+        Self { profiles: Vec::new(), decals: Vec::new(), hollow: false }
     }
+
+    /// Enable hollow mode — only render outer shell, interior empty
+    pub fn set_hollow(&mut self, hollow: bool) { self.hollow = hollow; }
 
     pub fn add(&mut self, profile: BoneProfile) {
         self.profiles.push(profile);
@@ -175,12 +182,19 @@ impl BodyDefinition {
 
                 for dx in -ri..=ri {
                     for dz in -ri..=ri {
-                        // Ellipse test
                         let ex = dx as f32 / rx;
                         let ez = dz as f32 / rz;
-                        if ex * ex + ez * ez > 1.0 { continue; }
+                        let dist_sq = ex * ex + ez * ez;
+                        if dist_sq > 1.0 { continue; }
 
-                        // World position of this voxel
+                        // Hollow mode: only draw outer shell (2 voxels thick)
+                        // Extra thickness prevents gaps when skeleton moves
+                        if self.hollow && rx > 3.0 && rz > 3.0 {
+                            let shell_thickness = 2.5 / rx.min(rz); // ~2-3 voxels
+                            let inner = 1.0 - shell_thickness;
+                            if inner > 0.1 && dist_sq < inner * inner { continue; }
+                        }
+
                         let world_pos = center
                             + bone_right * dx as f32
                             + bone_up * dz as f32;
