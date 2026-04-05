@@ -193,18 +193,43 @@ fn fs_main(in: VSOut) -> @location(0) vec4<f32> {
     // Shading
     let base_color = voxel_color(hit.voxel);
 
-    // Interior lighting: high ambient + omnidirectional fill
-    let light1 = normalize(vec3(0.0, -0.8, -1.0));  // from camera direction (front)
-    let light2 = normalize(vec3(0.5, 0.6, 0.3));    // top-right fill
+    // === VOXEL AO ===
+    // Check 6 neighbors around hit point — more occupied = darker
+    let hp = hit.pos;
+    var ao_count = 0.0;
+    var ao_total = 0.0;
+    // Check in a small neighborhood around the hit normal direction
+    for (var dx = -1; dx <= 1; dx++) {
+        for (var dy = -1; dy <= 1; dy++) {
+            for (var dz = -1; dz <= 1; dz++) {
+                if dx == 0 && dy == 0 && dz == 0 { continue; }
+                // Only check neighbors on the same side as the normal (exterior)
+                let check = vec3<f32>(f32(dx), f32(dy), f32(dz));
+                if dot(check, hit.normal) < -0.1 { continue; } // skip interior side
+                ao_total += 1.0;
+                let nx = hp.x + dx;
+                let ny = hp.y + dy;
+                let nz = hp.z + dz;
+                let nv = get_voxel(nx, ny, nz);
+                if voxel_mat(nv) != 0u {
+                    ao_count += 1.0;
+                }
+            }
+        }
+    }
+    let ao = 1.0 - (ao_count / max(ao_total, 1.0)) * 0.4; // 0.6 - 1.0
+
+    // === LIGHTING ===
+    let light1 = normalize(vec3(0.0, -0.8, -1.0));  // from camera
+    let light2 = normalize(vec3(0.5, 0.6, 0.3));    // top-right
     let light3 = normalize(vec3(-0.4, 0.3, -0.5));  // left fill
     let ndl1 = max(dot(hit.normal, light1), 0.0);
     let ndl2 = max(dot(hit.normal, light2), 0.0);
     let ndl3 = max(dot(hit.normal, light3), 0.0);
 
-    // High ambient for interior visibility
-    let ambient = 0.55;
-    let diffuse = ndl1 * 0.3 + ndl2 * 0.2 + ndl3 * 0.15;
-    let lit = base_color * (ambient + diffuse);
+    let ambient = 0.45;
+    let diffuse = ndl1 * 0.35 + ndl2 * 0.2 + ndl3 * 0.15;
+    let lit = base_color * (ambient + diffuse) * ao;
 
     // Minimal fog (almost none — interior scene)
     let dist = length(vec3<f32>(hit.pos) - ray_origin);
