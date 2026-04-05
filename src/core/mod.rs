@@ -9,3 +9,4 @@ pub mod streaming;
 pub mod backend;
 pub mod meshing;
 pub mod render_mesh;
+pub mod material;
