@@ -1,0 +1,1510 @@
+{
+  "version": 1,
+  "name": "Human",
+  "author": "Prometheus Editor",
+  "skeleton": {
+    "bones": [
+      {
+        "id": 0,
+        "name": "pelvis",
+        "parent": null,
+        "children": [
+          1,
+          13,
+          17
+        ],
+        "rest_length": 0.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "constraint": "Free",
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          140.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          0.0,
+          140.0,
+          0.0
+        ]
+      },
+      {
+        "id": 1,
+        "name": "spine",
+        "parent": 0,
+        "children": [
+          2
+        ],
+        "rest_length": 33.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 0.3,
+            "twist_min": -0.2,
+            "twist_max": 0.2
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          140.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          0.0,
+          173.0,
+          0.0
+        ]
+      },
+      {
+        "id": 2,
+        "name": "chest",
+        "parent": 1,
+        "children": [
+          3,
+          5,
+          9
+        ],
+        "rest_length": 45.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 0.25,
+            "twist_min": -0.3,
+            "twist_max": 0.3
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          173.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          0.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 3,
+        "name": "neck",
+        "parent": 2,
+        "children": [
+          4
+        ],
+        "rest_length": 15.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 0.5,
+            "twist_min": -0.8,
+            "twist_max": 0.8
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          0.0,
+          233.0,
+          0.0
+        ]
+      },
+      {
+        "id": 4,
+        "name": "head",
+        "parent": 3,
+        "children": [],
+        "rest_length": 27.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          1.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 0.3,
+            "twist_min": -0.5,
+            "twist_max": 0.5
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          233.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          0.0,
+          260.0,
+          0.0
+        ]
+      },
+      {
+        "id": 5,
+        "name": "shoulder_l",
+        "parent": 2,
+        "children": [
+          6
+        ],
+        "rest_length": 12.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": "Fixed",
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -12.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 6,
+        "name": "upper_arm_l",
+        "parent": 5,
+        "children": [
+          7
+        ],
+        "rest_length": 33.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 1.2,
+            "twist_min": -1.0,
+            "twist_max": 1.0
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          -12.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -45.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 7,
+        "name": "forearm_l",
+        "parent": 6,
+        "children": [
+          8
+        ],
+        "rest_length": 27.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": {
+          "Hinge": {
+            "axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "min_angle": 0.0,
+            "max_angle": 2.6
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          -45.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -72.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 8,
+        "name": "hand_l",
+        "parent": 7,
+        "children": [],
+        "rest_length": 12.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 1.0,
+            "twist_min": -0.5,
+            "twist_max": 0.5
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          -72.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -84.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 9,
+        "name": "shoulder_r",
+        "parent": 2,
+        "children": [
+          10
+        ],
+        "rest_length": 12.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": "Fixed",
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          12.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 10,
+        "name": "upper_arm_r",
+        "parent": 9,
+        "children": [
+          11
+        ],
+        "rest_length": 33.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 1.2,
+            "twist_min": -1.0,
+            "twist_max": 1.0
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          12.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          45.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 11,
+        "name": "forearm_r",
+        "parent": 10,
+        "children": [
+          12
+        ],
+        "rest_length": 27.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": {
+          "Hinge": {
+            "axis": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "min_angle": 0.0,
+            "max_angle": 2.6
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          45.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          72.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 12,
+        "name": "hand_r",
+        "parent": 11,
+        "children": [],
+        "rest_length": 12.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 1.0,
+            "twist_min": -0.5,
+            "twist_max": 0.5
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          72.0,
+          218.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          84.0,
+          218.0,
+          0.0
+        ]
+      },
+      {
+        "id": 13,
+        "name": "hip_l",
+        "parent": 0,
+        "children": [
+          14
+        ],
+        "rest_length": 9.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": "Fixed",
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          140.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -9.0,
+          140.0,
+          0.0
+        ]
+      },
+      {
+        "id": 14,
+        "name": "thigh_l",
+        "parent": 13,
+        "children": [
+          15
+        ],
+        "rest_length": 66.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          -0.14834046,
+          -0.98893636,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 1.0,
+            "twist_min": -0.3,
+            "twist_max": 0.3
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          -9.0,
+          140.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -18.79047,
+          74.7302,
+          0.0
+        ]
+      },
+      {
+        "id": 15,
+        "name": "shin_l",
+        "parent": 14,
+        "children": [
+          16
+        ],
+        "rest_length": 60.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "constraint": {
+          "Hinge": {
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "min_angle": 0.087,
+            "max_angle": 2.27
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          -18.79047,
+          74.7302,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -18.79047,
+          14.730202,
+          0.0
+        ]
+      },
+      {
+        "id": 16,
+        "name": "foot_l",
+        "parent": 15,
+        "children": [],
+        "rest_length": 24.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "constraint": {
+          "Hinge": {
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "min_angle": -0.35,
+            "max_angle": 0.87
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          -18.79047,
+          14.730202,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          -18.79047,
+          14.730202,
+          -24.0
+        ]
+      },
+      {
+        "id": 17,
+        "name": "hip_r",
+        "parent": 0,
+        "children": [
+          18
+        ],
+        "rest_length": 9.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          1.0,
+          0.0,
+          0.0
+        ],
+        "constraint": "Fixed",
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          0.0,
+          140.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          9.0,
+          140.0,
+          0.0
+        ]
+      },
+      {
+        "id": 18,
+        "name": "thigh_r",
+        "parent": 17,
+        "children": [
+          19
+        ],
+        "rest_length": 66.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.14834046,
+          -0.98893636,
+          0.0
+        ],
+        "constraint": {
+          "BallSocket": {
+            "cone_angle": 1.0,
+            "twist_min": -0.3,
+            "twist_max": 0.3
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          9.0,
+          140.0,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          18.79047,
+          74.7302,
+          0.0
+        ]
+      },
+      {
+        "id": 19,
+        "name": "shin_r",
+        "parent": 18,
+        "children": [
+          20
+        ],
+        "rest_length": 60.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ],
+        "constraint": {
+          "Hinge": {
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "min_angle": 0.087,
+            "max_angle": 2.27
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          18.79047,
+          74.7302,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          18.79047,
+          14.730202,
+          0.0
+        ]
+      },
+      {
+        "id": 20,
+        "name": "foot_r",
+        "parent": 19,
+        "children": [],
+        "rest_length": 24.0,
+        "rest_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "rest_direction": [
+          0.0,
+          0.0,
+          -1.0
+        ],
+        "constraint": {
+          "Hinge": {
+            "axis": [
+              1.0,
+              0.0,
+              0.0
+            ],
+            "min_angle": -0.35,
+            "max_angle": 0.87
+          }
+        },
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_position": [
+          18.79047,
+          14.730202,
+          0.0
+        ],
+        "world_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "world_end_position": [
+          18.79047,
+          14.730202,
+          -24.0
+        ]
+      }
+    ],
+    "name_to_id": {
+      "neck": 3,
+      "shoulder_r": 9,
+      "hip_r": 17,
+      "thigh_r": 18,
+      "shin_r": 19,
+      "hip_l": 13,
+      "forearm_r": 11,
+      "foot_r": 20,
+      "shoulder_l": 5,
+      "head": 4,
+      "upper_arm_l": 6,
+      "shin_l": 15,
+      "foot_l": 16,
+      "pelvis": 0,
+      "hand_l": 8,
+      "thigh_l": 14,
+      "hand_r": 12,
+      "spine": 1,
+      "chest": 2,
+      "upper_arm_r": 10,
+      "forearm_l": 7
+    },
+    "root": 0,
+    "root_position": [
+      0.0,
+      140.0,
+      0.0
+    ],
+    "root_rotation": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "attach_points": [
+      {
+        "name": "hand_r.grip",
+        "bone_id": 12,
+        "local_offset": [
+          9.0,
+          0.0,
+          0.0
+        ],
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "hand_l.support",
+        "bone_id": 8,
+        "local_offset": [
+          -9.0,
+          0.0,
+          0.0
+        ],
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "hip_r.holster",
+        "bone_id": 17,
+        "local_offset": [
+          15.0,
+          0.0,
+          0.0
+        ],
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "hip_l.holster",
+        "bone_id": 13,
+        "local_offset": [
+          -15.0,
+          0.0,
+          0.0
+        ],
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "name": "back.sling",
+        "bone_id": 2,
+        "local_offset": [
+          0.0,
+          15.0,
+          15.0
+        ],
+        "local_rotation": [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "body_profiles": [
+    {
+      "bone_name": "spine",
+      "base_radius": 21.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "chest",
+      "base_radius": 24.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "neck",
+      "base_radius": 9.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "head",
+      "base_radius": 16.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "shoulder_l",
+      "base_radius": 15.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "upper_arm_l",
+      "base_radius": 10.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "forearm_l",
+      "base_radius": 9.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "hand_l",
+      "base_radius": 6.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "shoulder_r",
+      "base_radius": 15.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "upper_arm_r",
+      "base_radius": 10.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "forearm_r",
+      "base_radius": 9.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "hand_r",
+      "base_radius": 6.0,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "thigh_l",
+      "base_radius": 13.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.25,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.75,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "shin_l",
+      "base_radius": 10.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "foot_l",
+      "base_radius": 10.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "thigh_r",
+      "base_radius": 13.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.25,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.75,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "shin_r",
+      "base_radius": 10.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.33333334,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.6666667,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    },
+    {
+      "bone_name": "foot_r",
+      "base_radius": 10.5,
+      "points": [
+        {
+          "t": 0.0,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 0.5,
+          "radius_mul": 1.0
+        },
+        {
+          "t": 1.0,
+          "radius_mul": 1.0
+        }
+      ]
+    }
+  ],
+  "animations": [],
+  "scale": 3.0
+}

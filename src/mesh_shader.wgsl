@@ -62,11 +62,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let fill = max(dot(N, fill_dir), 0.0) * 0.15;
 
     // Combine
-    let ambient = u.ambient.rgb * u.ambient.w;
-    let diffuse = u.light_color.rgb * NdotL * 0.6;
+    let ambient = u.ambient.rgb * u.ambient.w * 1.5;
+    let diffuse = u.light_color.rgb * NdotL * 0.7;
     let specular = u.light_color.rgb * spec;
 
-    let lit = in.color.rgb * (ambient + diffuse + fill) + specular;
+    let lit = in.color.rgb * (ambient + diffuse + fill * 1.5) + specular;
 
     // Fog (distance-based)
     let dist = length(u.eye_pos.xyz - in.world_pos);

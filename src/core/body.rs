@@ -20,6 +20,8 @@ pub struct BodySection {
     pub radius_z: f32,
     /// Center offset from bone axis (for asymmetric shapes)
     pub offset: Vec2,
+    /// Superellipse exponent: 2.0 = ellipse, 2.5 = rounded rect, 3.0+ = boxy
+    pub n: f32,
 }
 
 /// Profile for one bone — how "thick" the body is around it
@@ -37,8 +39,8 @@ impl BoneProfile {
         Self {
             bone_id,
             sections: vec![
-                BodySection { t: 0.0, radius_x: radius, radius_z: radius, offset: Vec2::ZERO },
-                BodySection { t: 1.0, radius_x: radius, radius_z: radius, offset: Vec2::ZERO },
+                BodySection { t: 0.0, radius_x: radius, radius_z: radius, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: radius, radius_z: radius, offset: Vec2::ZERO, n: 2.0 },
             ],
             material_id: mat,
             color,
@@ -50,8 +52,8 @@ impl BoneProfile {
         Self {
             bone_id,
             sections: vec![
-                BodySection { t: 0.0, radius_x: r_start, radius_z: r_start, offset: Vec2::ZERO },
-                BodySection { t: 1.0, radius_x: r_end, radius_z: r_end, offset: Vec2::ZERO },
+                BodySection { t: 0.0, radius_x: r_start, radius_z: r_start, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: r_end, radius_z: r_end, offset: Vec2::ZERO, n: 2.0 },
             ],
             material_id: mat,
             color,
@@ -66,7 +68,7 @@ impl BoneProfile {
     /// Interpolate cross-section at position t (0.0-1.0)
     fn section_at(&self, t: f32) -> BodySection {
         if self.sections.is_empty() {
-            return BodySection { t, radius_x: 1.0, radius_z: 1.0, offset: Vec2::ZERO };
+            return BodySection { t, radius_x: 1.0, radius_z: 1.0, offset: Vec2::ZERO, n: 2.0 };
         }
         if self.sections.len() == 1 || t <= self.sections[0].t {
             return self.sections[0].clone();
@@ -86,6 +88,7 @@ impl BoneProfile {
                     radius_x: s0.radius_x + (s1.radius_x - s0.radius_x) * frac,
                     radius_z: s0.radius_z + (s1.radius_z - s0.radius_z) * frac,
                     offset: s0.offset + (s1.offset - s0.offset) * frac,
+                    n: s0.n + (s1.n - s0.n) * frac,
                 };
             }
         }
@@ -150,6 +153,8 @@ impl BodyDefinition {
     pub fn rasterize<F>(&self, skeleton: &Skeleton, grid_size: usize, mut set_voxel: F)
     where F: FnMut(usize, usize, usize, u8, u8, u8, u8) {
         // First: bone profiles (body volume)
+        // Bone blending: extend t slightly for smooth joint transitions
+        let t_extend = 0.08;
         for profile in &self.profiles {
             let bone = skeleton.bone_by_id(profile.bone_id);
             let start = bone.world_position;
@@ -159,40 +164,44 @@ impl BodyDefinition {
             if bone_len < 0.01 { continue; }
 
             let bone_fwd = bone_dir / bone_len;
-
-            // Build local coordinate frame for the bone
-            // X = right, Y = forward (along bone), Z = up (perpendicular)
             let (bone_right, bone_up) = build_perpendicular_frame(bone_fwd);
 
-            // Step along the bone
+            // Extended range for bone blending (overlap with neighbors)
             let steps = (bone_len * 2.0).max(4.0) as usize;
-            for i in 0..=steps {
-                let t = i as f32 / steps as f32;
-                let section = profile.section_at(t);
+            let extended_steps = ((1.0 + t_extend * 2.0) * steps as f32) as usize;
+            for i in 0..=extended_steps {
+                let t = -t_extend + i as f32 / steps as f32;
 
-                // World position along bone
+                // Fade at bone boundaries (smooth blending)
+                let fade = if t < 0.0 { (1.0 + t / t_extend).max(0.0) }
+                      else if t > 1.0 { (1.0 - (t - 1.0) / t_extend).max(0.0) }
+                      else { 1.0 };
+                if fade < 0.01 { continue; }
+
+                let section = profile.section_at(t.clamp(0.0, 1.0));
+                let rx = section.radius_x * fade;
+                let rz = section.radius_z * fade;
+                if rx < 0.5 || rz < 0.5 { continue; }
+
                 let center = start + bone_dir * t
                     + bone_right * section.offset.x
                     + bone_up * section.offset.y;
 
-                // Fill ellipse at this cross-section
-                let rx = section.radius_x;
-                let rz = section.radius_z;
                 let ri = rx.max(rz).ceil() as i32;
+                let n = section.n;
 
                 for dx in -ri..=ri {
                     for dz in -ri..=ri {
-                        let ex = dx as f32 / rx;
-                        let ez = dz as f32 / rz;
-                        let dist_sq = ex * ex + ez * ez;
-                        if dist_sq > 1.0 { continue; }
+                        // Superellipse: |x/rx|^n + |z/rz|^n <= 1
+                        let ex = (dx as f32 / rx).abs();
+                        let ez = (dz as f32 / rz).abs();
+                        let dist = ex.powf(n) + ez.powf(n);
+                        if dist > 1.0 { continue; }
 
-                        // Hollow mode: only draw outer shell (2 voxels thick)
-                        // Extra thickness prevents gaps when skeleton moves
                         if self.hollow && rx > 3.0 && rz > 3.0 {
-                            let shell_thickness = 2.5 / rx.min(rz); // ~2-3 voxels
+                            let shell_thickness = 2.5 / rx.min(rz);
                             let inner = 1.0 - shell_thickness;
-                            if inner > 0.1 && dist_sq < inner * inner { continue; }
+                            if inner > 0.1 && dist < inner.powf(n) { continue; }
                         }
 
                         let world_pos = center
@@ -292,7 +301,145 @@ fn build_perpendicular_frame(forward: Vec3) -> (Vec3, Vec3) {
 // ═══════════════════════════════════════════════════════════════
 
 impl BodyDefinition {
-    /// Standard human body (ORPP soldier proportions)
+    /// Phase 1: Bare skeleton — bones only, no soft tissue
+    /// Skull, ribcage, pelvis, long bones with epiphyses
+    pub fn human_skeleton_only(skeleton: &Skeleton, scale: f32) -> Self {
+        let mut body = BodyDefinition::new();
+        let s = scale;
+        let bone_c: [u8; 3] = [235, 225, 200]; // ivory bone color
+
+        // ── SKULL — from reference: elongated back, flat face, bulging occiput ──
+        // Key: rz > rx at cranium level, center shifts BACKWARD at t=0.5-0.7
+        body.add(BoneProfile::elliptical(skeleton.bone("head").id, vec![
+            BodySection { t: 0.0,  radius_x: 2.0*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },             // chin (narrow V)
+            BodySection { t: 0.1,  radius_x: 3.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.3 },             // mandible (wide, shallow, angular)
+            BodySection { t: 0.25, radius_x: 4.5*s, radius_z: 3.5*s, offset: Vec2::new(0.0, 0.3*s), n: 2.0 },  // zygomatic/cheekbones (face fwd)
+            BodySection { t: 0.35, radius_x: 4.5*s, radius_z: 4.0*s, offset: Vec2::new(0.0, 0.2*s), n: 2.0 },  // orbit level
+            BodySection { t: 0.50, radius_x: 4.3*s, radius_z: 5.0*s, offset: Vec2::new(0.0, -0.5*s), n: 2.0 }, // temporal (rz > rx! center back)
+            BodySection { t: 0.65, radius_x: 4.2*s, radius_z: 5.5*s, offset: Vec2::new(0.0, -1.0*s), n: 2.0 }, // parietal MAX (occiput bulge)
+            BodySection { t: 0.80, radius_x: 3.8*s, radius_z: 4.5*s, offset: Vec2::new(0.0, -0.5*s), n: 2.0 }, // upper parietal
+            BodySection { t: 0.95, radius_x: 2.5*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },             // crown taper
+            BodySection { t: 1.0,  radius_x: 2.0*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 },             // top
+        ], 10, bone_c));
+
+        // ── CERVICAL SPINE — thin vertebral column ──
+        body.add(BoneProfile::elliptical(skeleton.bone("neck").id, vec![
+            BodySection { t: 0.0, radius_x: 2.0*s, radius_z: 1.8*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 0.5, radius_x: 1.8*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 1.0, radius_x: 1.8*s, radius_z: 1.8*s, offset: Vec2::ZERO, n: 2.0 },
+        ], 10, bone_c));
+
+        // ── RIBCAGE (chest) — large barrel ──
+        body.add(BoneProfile::elliptical(skeleton.bone("chest").id, vec![
+            BodySection { t: 0.0, radius_x: 5.5*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 2.3 },
+            BodySection { t: 0.3, radius_x: 7.5*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.3 },
+            BodySection { t: 0.5, radius_x: 8.0*s, radius_z: 5.5*s, offset: Vec2::ZERO, n: 2.3 },  // max
+            BodySection { t: 0.7, radius_x: 7.5*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.3 },
+            BodySection { t: 1.0, radius_x: 5.5*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 2.0 },
+        ], 10, bone_c));
+
+        // ── LUMBAR SPINE — thin vertebral column ──
+        body.add(BoneProfile::elliptical(skeleton.bone("spine").id, vec![
+            BodySection { t: 0.0, radius_x: 2.0*s, radius_z: 1.8*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 0.5, radius_x: 1.8*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 1.0, radius_x: 1.8*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+        ], 10, bone_c));
+
+        // ── PELVIS — LARGE butterfly, widest bone ──
+        body.add(BoneProfile::elliptical(skeleton.bone("pelvis").id, vec![
+            BodySection { t: 0.0, radius_x: 8.0*s, radius_z: 4.5*s, offset: Vec2::ZERO, n: 2.5 },
+        ], 10, bone_c));
+
+        // ── CLAVICLES — visible S-shaped rods ──
+        for side in ["shoulder_l", "shoulder_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 2.0*s, radius_z: 1.8*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.5, radius_x: 1.8*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 2.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── HUMERUS — thick bone with ball joints ──
+        for side in ["upper_arm_l", "upper_arm_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0,  radius_x: 3.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.1,  radius_x: 2.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.5,  radius_x: 2.0*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.9,  radius_x: 2.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0,  radius_x: 3.0*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── RADIUS/ULNA — two bones as one thicker profile ──
+        for side in ["forearm_l", "forearm_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 2.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.2, radius_x: 2.2*s, radius_z: 1.8*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.5, radius_x: 2.0*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 2.0*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── HAND BONES ──
+        for side in ["hand_l", "hand_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 2.0*s, radius_z: 1.2*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 0.5, radius_x: 2.5*s, radius_z: 1.2*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 1.0, radius_x: 1.5*s, radius_z: 0.8*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── HIP BONES — large iliac wings ──
+        for side in ["hip_l", "hip_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 4.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 1.0, radius_x: 3.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── FEMUR — thick, largest long bone ──
+        for side in ["thigh_l", "thigh_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0,  radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.1,  radius_x: 2.8*s, radius_z: 2.8*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.5,  radius_x: 2.2*s, radius_z: 2.2*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.9,  radius_x: 2.8*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0,  radius_x: 3.5*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── TIBIA/FIBULA — visible, solid ──
+        for side in ["shin_l", "shin_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0,  radius_x: 3.0*s, radius_z: 2.8*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.15, radius_x: 2.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.5,  radius_x: 2.0*s, radius_z: 1.8*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.9,  radius_x: 2.0*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0,  radius_x: 2.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // ── FOOT BONES ──
+        for side in ["foot_l", "foot_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 2.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 0.3, radius_x: 3.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 0.7, radius_x: 3.5*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 3.0 },
+                BodySection { t: 1.0, radius_x: 2.5*s, radius_z: 1.0*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, bone_c));
+        }
+
+        // Eye sockets + nasal aperture
+        let head_id = skeleton.bone("head").id;
+        body.add_decal(head_id, Vec3::new(-1.5*s, 2.5*s, -4.0*s), DecalShape::LineH(2.0*s), 1, [40, 35, 30]);
+        body.add_decal(head_id, Vec3::new(1.5*s, 2.5*s, -4.0*s), DecalShape::LineH(2.0*s), 1, [40, 35, 30]);
+        body.add_decal(head_id, Vec3::new(0.0, 1.5*s, -4.0*s), DecalShape::LineH(1.0*s), 1, [50, 45, 40]); // nose hole
+
+        body
+    }
+
+    /// Phase 2: Bare body — soft tissue over skeleton (Barbie anatomy)
+    /// To be built after skeleton proportions are approved
     pub fn human_soldier(skeleton: &Skeleton, scale: f32) -> Self {
         let mut body = BodyDefinition::new();
         let s = scale;
@@ -303,77 +450,130 @@ impl BodyDefinition {
         let boot: [u8; 3] = [80, 68, 55];
         let belt_c: [u8; 3] = [150, 130, 95];
 
-        // Head — sphere (equal radii)
-        body.add(BoneProfile::cylinder(skeleton.bone("head").id, 6.0*s, 10, skin));
+        // ── HEAD — egg shape, bare (no helmet for now) ──
+        body.add(BoneProfile::elliptical(skeleton.bone("head").id, vec![
+            BodySection { t: 0.0,  radius_x: 3.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },  // chin
+            BodySection { t: 0.15, radius_x: 4.5*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 2.0 },  // jaw
+            BodySection { t: 0.3,  radius_x: 5.5*s, radius_z: 5.5*s, offset: Vec2::ZERO, n: 2.0 },  // cheekbones
+            BodySection { t: 0.5,  radius_x: 6.0*s, radius_z: 6.0*s, offset: Vec2::ZERO, n: 2.0 },  // temples
+            BodySection { t: 0.7,  radius_x: 5.8*s, radius_z: 6.5*s, offset: Vec2::new(0.0, -0.5*s), n: 2.0 }, // occiput
+            BodySection { t: 0.9,  radius_x: 4.5*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.0 },  // crown taper
+            BodySection { t: 1.0,  radius_x: 3.0*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },  // top
+        ], 10, skin));
 
-        // Neck
-        body.add(BoneProfile::tapered(skeleton.bone("neck").id, 3.5*s, 4.0*s, 10, skin));
+        // ── NECK — trapezoid, wider at base ──
+        body.add(BoneProfile::elliptical(skeleton.bone("neck").id, vec![
+            BodySection { t: 0.0, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 0.5, radius_x: 3.5*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 1.0, radius_x: 3.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+        ], 10, skin));
 
-        // Chest — wide, flat (elliptical)
+        // ── CHEST — barrel, light coat, superellipse n=2.3 ──
         body.add(BoneProfile::elliptical(skeleton.bone("chest").id, vec![
-            BodySection { t: 0.0, radius_x: 8.0*s, radius_z: 5.0*s, offset: Vec2::ZERO },
-            BodySection { t: 0.5, radius_x: 10.0*s, radius_z: 5.5*s, offset: Vec2::ZERO },
-            BodySection { t: 1.0, radius_x: 11.0*s, radius_z: 5.0*s, offset: Vec2::ZERO },
+            BodySection { t: 0.0, radius_x: 7.0*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.3 },
+            BodySection { t: 0.3, radius_x: 8.5*s, radius_z: 5.5*s, offset: Vec2::new(0.0, 0.5*s), n: 2.3 },
+            BodySection { t: 0.5, radius_x: 9.0*s, radius_z: 6.0*s, offset: Vec2::new(0.0, 0.5*s), n: 2.3 }, // max
+            BodySection { t: 0.7, radius_x: 8.5*s, radius_z: 5.5*s, offset: Vec2::ZERO, n: 2.3 },
+            BodySection { t: 1.0, radius_x: 7.0*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.0 },
         ], 5, coat));
 
-        // Spine — waist (narrower)
+        // ── SPINE — waist! The key anatomical landmark ──
         body.add(BoneProfile::elliptical(skeleton.bone("spine").id, vec![
-            BodySection { t: 0.0, radius_x: 8.0*s, radius_z: 5.0*s, offset: Vec2::ZERO },
-            BodySection { t: 1.0, radius_x: 7.0*s, radius_z: 4.5*s, offset: Vec2::ZERO },
+            BodySection { t: 0.0, radius_x: 8.0*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.3 },
+            BodySection { t: 0.3, radius_x: 7.0*s, radius_z: 4.5*s, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 0.7, radius_x: 6.5*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 2.0 },  // WAIST
+            BodySection { t: 1.0, radius_x: 7.0*s, radius_z: 4.5*s, offset: Vec2::ZERO, n: 2.3 },
         ], 5, coat));
 
-        // Pelvis — belt area
+        // ── PELVIS — belt ──
         body.add(BoneProfile::elliptical(skeleton.bone("pelvis").id, vec![
-            BodySection { t: 0.0, radius_x: 8.0*s, radius_z: 5.0*s, offset: Vec2::ZERO },
+            BodySection { t: 0.0, radius_x: 8.5*s, radius_z: 5.5*s, offset: Vec2::ZERO, n: 2.3 },
         ], 10, belt_c));
 
-        // Upper arms (coat sleeves)
-        for side in ["upper_arm_l", "upper_arm_r"] {
-            body.add(BoneProfile::tapered(skeleton.bone(side).id, 4.0*s, 3.5*s, 5, coat));
-        }
-
-        // Forearms (coat sleeves, thinner)
-        for side in ["forearm_l", "forearm_r"] {
-            body.add(BoneProfile::tapered(skeleton.bone(side).id, 3.5*s, 3.0*s, 5, coat));
-        }
-
-        // Hands (skin)
-        for side in ["hand_l", "hand_r"] {
-            body.add(BoneProfile::cylinder(skeleton.bone(side).id, 2.5*s, 10, skin));
-        }
-
-        // Shoulders
+        // ── SHOULDERS — barrel/olive shape (deltoid muscle) ──
         for side in ["shoulder_l", "shoulder_r"] {
-            body.add(BoneProfile::cylinder(skeleton.bone(side).id, 5.5*s, 5, coat));
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.5, radius_x: 5.0*s, radius_z: 4.5*s, offset: Vec2::ZERO, n: 2.0 }, // deltoid peak
+                BodySection { t: 1.0, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 5, coat));
         }
 
-        // Thighs (pants)
+        // ── UPPER ARMS — spindle shape (bicep peak at t=0.2, thin elbow) ──
+        for side in ["upper_arm_l", "upper_arm_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.2, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 }, // bicep
+                BodySection { t: 0.5, radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.8, radius_x: 3.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 2.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 }, // elbow
+            ], 5, coat));
+        }
+
+        // ── FOREARMS — spindle (muscle at top, thin wrist) ──
+        for side in ["forearm_l", "forearm_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 3.0*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.2, radius_x: 3.5*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 }, // forearm muscle
+                BodySection { t: 0.5, radius_x: 3.0*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 2.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.0 }, // wrist (gloved)
+            ], 5, coat));
+        }
+
+        // ── HANDS — flat paddle, fist in glove ──
+        for side in ["hand_l", "hand_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 2.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 0.5, radius_x: 2.5*s, radius_z: 2.5*s, offset: Vec2::ZERO, n: 2.5 },
+                BodySection { t: 1.0, radius_x: 1.5*s, radius_z: 1.5*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 10, skin));
+        }
+
+        // ── HIPS — transition from pelvis to thigh ──
+        for side in ["hip_l", "hip_r"] {
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 4.0*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 5.0*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.0 },
+            ], 5, pants));
+        }
+
+        // ── THIGHS — powerful spindle (quadriceps peak at t=0.2, thin knee) ──
         for side in ["thigh_l", "thigh_r"] {
-            body.add(BoneProfile::tapered(skeleton.bone(side).id, 5.0*s, 4.5*s, 5, pants));
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0, radius_x: 5.5*s, radius_z: 5.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.2, radius_x: 6.0*s, radius_z: 5.5*s, offset: Vec2::new(0.0, 0.5*s), n: 2.0 }, // quad
+                BodySection { t: 0.5, radius_x: 5.0*s, radius_z: 5.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.8, radius_x: 4.0*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 }, // knee
+            ], 5, pants));
         }
 
-        // Shins (pants, thinner)
+        // ── SHINS — calf spindle (peak at t=0.15, thin ankle + boots) ──
         for side in ["shin_l", "shin_r"] {
-            body.add(BoneProfile::tapered(skeleton.bone(side).id, 4.5*s, 4.0*s, 5, pants));
+            body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
+                BodySection { t: 0.0,  radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.15, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::new(0.0, -1.0*s), n: 2.0 }, // calf (back!)
+                BodySection { t: 0.3,  radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 0.7,  radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 }, // boots thicken
+                BodySection { t: 1.0,  radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 }, // boot ankle
+            ], 5, pants));
         }
 
-        // Feet/boots
+        // ── FEET — flat platform with boots ──
         for side in ["foot_l", "foot_r"] {
             body.add(BoneProfile::elliptical(skeleton.bone(side).id, vec![
-                BodySection { t: 0.0, radius_x: 4.5*s, radius_z: 3.0*s, offset: Vec2::ZERO },
-                BodySection { t: 1.0, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO },
+                BodySection { t: 0.0, radius_x: 3.5*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 3.0 },
+                BodySection { t: 0.3, radius_x: 4.5*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 3.0 },
+                BodySection { t: 0.7, radius_x: 4.5*s, radius_z: 3.0*s, offset: Vec2::ZERO, n: 3.0 },
+                BodySection { t: 1.0, radius_x: 3.5*s, radius_z: 2.0*s, offset: Vec2::ZERO, n: 2.5 },
             ], 10, boot));
         }
 
-        // Face decals on head bone
+        // ── Face decals (adjusted for new head size) ──
         let head_id = skeleton.bone("head").id;
-        // UGT Visor (cyan bar across eyes)
-        body.add_decal(head_id, Vec3::new(0.0, 1.0*s, -6.0*s), DecalShape::LineH(10.0*s), 2, [30, 250, 255]);
-        body.add_decal(head_id, Vec3::new(0.0, 2.0*s, -6.0*s), DecalShape::LineH(10.0*s), 2, [30, 250, 255]);
-        // Nose
-        body.add_decal(head_id, Vec3::new(0.0, -1.0*s, -6.5*s), DecalShape::Point, 10, [210, 175, 145]);
-        // Mouth
-        body.add_decal(head_id, Vec3::new(0.0, -3.0*s, -6.0*s), DecalShape::LineH(4.0*s), 10, [200, 165, 135]);
+        // Visor at eye level (t≈0.35, so local Y ≈ 4.5*s from chin)
+        body.add_decal(head_id, Vec3::new(0.0, 4.5*s, -7.0*s), DecalShape::LineH(10.0*s), 2, [30, 250, 255]);
+        body.add_decal(head_id, Vec3::new(0.0, 5.0*s, -7.0*s), DecalShape::LineH(10.0*s), 2, [30, 250, 255]);
 
         body
     }
@@ -398,8 +598,8 @@ impl BodyDefinition {
         // Spine segments (body)
         for sp in ["spine2", "spine1"] {
             body.add(BoneProfile::elliptical(skeleton.bone(sp).id, vec![
-                BodySection { t: 0.0, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO },
-                BodySection { t: 1.0, radius_x: 4.5*s, radius_z: 4.0*s, offset: Vec2::ZERO },
+                BodySection { t: 0.0, radius_x: 4.0*s, radius_z: 3.5*s, offset: Vec2::ZERO, n: 2.0 },
+                BodySection { t: 1.0, radius_x: 4.5*s, radius_z: 4.0*s, offset: Vec2::ZERO, n: 2.0 },
             ], 13, fur));
         }
 
@@ -455,8 +655,8 @@ mod tests {
     #[test]
     fn test_section_interpolation() {
         let profile = BoneProfile::elliptical(0, vec![
-            BodySection { t: 0.0, radius_x: 10.0, radius_z: 5.0, offset: Vec2::ZERO },
-            BodySection { t: 1.0, radius_x: 6.0, radius_z: 3.0, offset: Vec2::ZERO },
+            BodySection { t: 0.0, radius_x: 10.0, radius_z: 5.0, offset: Vec2::ZERO, n: 2.0 },
+            BodySection { t: 1.0, radius_x: 6.0, radius_z: 3.0, offset: Vec2::ZERO, n: 2.0 },
         ], 1, [255,255,255]);
 
         let mid = profile.section_at(0.5);

@@ -12,13 +12,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 use glam::{Quat, Vec3};
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 /// Unique identifier for a bone
 pub type BoneId = u16;
 
 /// Joint constraint — defines how a bone can rotate relative to its parent
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum JointConstraint {
     /// No rotation allowed (fused joint)
     Fixed,
@@ -47,7 +48,7 @@ pub enum JointConstraint {
 }
 
 /// A single bone in the skeleton hierarchy
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Bone {
     /// Unique ID
     pub id: BoneId,
@@ -99,7 +100,7 @@ impl Bone {
 }
 
 /// Named attachment point on a bone
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AttachPoint {
     pub name: String,
     pub bone_id: BoneId,
@@ -110,6 +111,7 @@ pub struct AttachPoint {
 }
 
 /// The full skeleton — a tree of bones
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Skeleton {
     bones: Vec<Bone>,
     name_to_id: HashMap<String, BoneId>,
@@ -307,59 +309,59 @@ impl Skeleton {
     pub fn human(scale: f32) -> Self {
         let mut sk = Skeleton::new("pelvis");
 
-        // Spine chain (up from pelvis)
-        sk.add_bone("spine", "pelvis", 12.0*scale, Vec3::Y,
+        // Spine chain (up from pelvis) — Aelis proportions
+        sk.add_bone("spine", "pelvis", 11.0*scale, Vec3::Y,
             JointConstraint::BallSocket { cone_angle: 0.3, twist_min: -0.2, twist_max: 0.2 });
-        sk.add_bone("chest", "spine", 14.0*scale, Vec3::Y,
+        sk.add_bone("chest", "spine", 15.0*scale, Vec3::Y,
             JointConstraint::BallSocket { cone_angle: 0.25, twist_min: -0.3, twist_max: 0.3 });
-        sk.add_bone("neck", "chest", 6.0*scale, Vec3::Y,
+        sk.add_bone("neck", "chest", 5.0*scale, Vec3::Y,
             JointConstraint::BallSocket { cone_angle: 0.5, twist_min: -0.8, twist_max: 0.8 });
-        sk.add_bone("head", "neck", 8.0*scale, Vec3::Y,
+        sk.add_bone("head", "neck", 9.0*scale, Vec3::Y,
             JointConstraint::BallSocket { cone_angle: 0.3, twist_min: -0.5, twist_max: 0.5 });
 
-        // Left arm
-        sk.add_bone("shoulder_l", "chest", 6.0*scale, Vec3::NEG_X,
+        // Left arm — shoulder shortened to kill "airplane" (6→4)
+        sk.add_bone("shoulder_l", "chest", 4.0*scale, Vec3::NEG_X,
             JointConstraint::Fixed);
-        sk.add_bone("upper_arm_l", "shoulder_l", 14.0*scale, Vec3::NEG_Y,
+        sk.add_bone("upper_arm_l", "shoulder_l", 11.0*scale, Vec3::NEG_X,
             JointConstraint::BallSocket { cone_angle: 1.2, twist_min: -1.0, twist_max: 1.0 });
-        sk.add_bone("forearm_l", "upper_arm_l", 12.0*scale, Vec3::NEG_Y,
-            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 2.6 }); // elbow: 0-150°
-        sk.add_bone("hand_l", "forearm_l", 6.0*scale, Vec3::NEG_Y,
+        sk.add_bone("forearm_l", "upper_arm_l", 9.0*scale, Vec3::NEG_X,
+            JointConstraint::Hinge { axis: Vec3::Y, min_angle: 0.0, max_angle: 2.6 });
+        sk.add_bone("hand_l", "forearm_l", 4.0*scale, Vec3::NEG_X,
             JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.5, twist_max: 0.5 });
 
         // Right arm (mirror)
-        sk.add_bone("shoulder_r", "chest", 6.0*scale, Vec3::X,
+        sk.add_bone("shoulder_r", "chest", 4.0*scale, Vec3::X,
             JointConstraint::Fixed);
-        sk.add_bone("upper_arm_r", "shoulder_r", 14.0*scale, Vec3::NEG_Y,
+        sk.add_bone("upper_arm_r", "shoulder_r", 11.0*scale, Vec3::X,
             JointConstraint::BallSocket { cone_angle: 1.2, twist_min: -1.0, twist_max: 1.0 });
-        sk.add_bone("forearm_r", "upper_arm_r", 12.0*scale, Vec3::NEG_Y,
-            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 2.6 });
-        sk.add_bone("hand_r", "forearm_r", 6.0*scale, Vec3::NEG_Y,
+        sk.add_bone("forearm_r", "upper_arm_r", 9.0*scale, Vec3::X,
+            JointConstraint::Hinge { axis: Vec3::Y, min_angle: 0.0, max_angle: 2.6 });
+        sk.add_bone("hand_r", "forearm_r", 4.0*scale, Vec3::X,
             JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.5, twist_max: 0.5 });
 
-        // Left leg
-        sk.add_bone("hip_l", "pelvis", 4.0*scale, Vec3::NEG_X,
+        // Left leg — hip shortened (4→3)
+        sk.add_bone("hip_l", "pelvis", 3.0*scale, Vec3::NEG_X,
             JointConstraint::Fixed);
-        sk.add_bone("thigh_l", "hip_l", 22.0*scale, Vec3::NEG_Y,
+        sk.add_bone("thigh_l", "hip_l", 22.0*scale, Vec3::new(-0.15, -1.0, 0.0).normalize(),
             JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
         sk.add_bone("shin_l", "thigh_l", 20.0*scale, Vec3::NEG_Y,
             JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.087, max_angle: 2.27 }); // knee: 5°-130°
         sk.add_bone("foot_l", "shin_l", 8.0*scale, Vec3::NEG_Z,
             JointConstraint::Hinge { axis: Vec3::X, min_angle: -0.35, max_angle: 0.87 }); // ankle: -20° to 50°
 
-        // Right leg (mirror)
-        sk.add_bone("hip_r", "pelvis", 4.0*scale, Vec3::X,
+        // Right leg (Vitruvian: mirror spread)
+        sk.add_bone("hip_r", "pelvis", 3.0*scale, Vec3::X,
             JointConstraint::Fixed);
-        sk.add_bone("thigh_r", "hip_r", 22.0*scale, Vec3::NEG_Y,
+        sk.add_bone("thigh_r", "hip_r", 22.0*scale, Vec3::new(0.15, -1.0, 0.0).normalize(),
             JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
         sk.add_bone("shin_r", "thigh_r", 20.0*scale, Vec3::NEG_Y,
             JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.087, max_angle: 2.27 });
         sk.add_bone("foot_r", "shin_r", 8.0*scale, Vec3::NEG_Z,
             JointConstraint::Hinge { axis: Vec3::X, min_angle: -0.35, max_angle: 0.87 });
 
-        // Attachment points
-        sk.add_attach_point("hand_r.grip", "hand_r", Vec3::new(0.0, -3.0*scale, 0.0));
-        sk.add_attach_point("hand_l.support", "hand_l", Vec3::new(0.0, -3.0*scale, 0.0));
+        // Attachment points (offsets along bone direction)
+        sk.add_attach_point("hand_r.grip", "hand_r", Vec3::new(3.0*scale, 0.0, 0.0));
+        sk.add_attach_point("hand_l.support", "hand_l", Vec3::new(-3.0*scale, 0.0, 0.0));
         sk.add_attach_point("hip_r.holster", "hip_r", Vec3::new(5.0*scale, 0.0, 0.0));
         sk.add_attach_point("hip_l.holster", "hip_l", Vec3::new(-5.0*scale, 0.0, 0.0));
         sk.add_attach_point("back.sling", "chest", Vec3::new(0.0, 5.0*scale, 5.0*scale));

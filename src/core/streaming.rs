@@ -123,7 +123,7 @@ impl WorldDiff {
 
     /// Memory usage
     pub fn memory_bytes(&self) -> usize {
-        (self.removed.len() * 20 + self.added.len() * 28) // approximate
+        self.removed.len() * 20 + self.added.len() * 28 // approximate
     }
 }
 

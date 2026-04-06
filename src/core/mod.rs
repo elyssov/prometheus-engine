@@ -11,3 +11,4 @@ pub mod meshing;
 pub mod render_mesh;
 pub mod material;
 pub mod destruction;
+pub mod sdf_body;

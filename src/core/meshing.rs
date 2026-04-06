@@ -1,13 +1,14 @@
 // ═══════════════════════════════════════════════════════════════
-// PROMETHEUS ENGINE — Marching Cubes Mesh Generator
+// PROMETHEUS ENGINE — Mesh Generator (Sharp + Smooth)
 //
 // Converts voxel data into triangle meshes for GPU rendering.
 // Voxels = data (physics, destruction). Polygons = render (GPU).
 //
-// Smooth surfaces for organic shapes (bodies, terrain).
-// Sharp edges for architecture (walls, furniture) via edge detection.
+// Two modes:
+//   generate_mesh()        — sharp quads, good for architecture
+//   generate_mesh_smooth() — Surface Nets, good for organic shapes
 //
-// Each 64³ chunk → ~50-100K triangles, generated in ~0.5ms on CPU.
+// Each 64³ chunk → ~50-100K triangles, generated in ~2ms on CPU.
 // ═══════════════════════════════════════════════════════════════
 
 use glam::Vec3;
@@ -206,6 +207,317 @@ pub fn generate_mesh_with_ao(
     mesh
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SURFACE NETS — Smooth Mesh Generation
+//
+// Algorithm:
+//   Phase 1: For each cell straddling the surface, place a vertex
+//            at the average position of edge crossings.
+//   Phase 2: For each grid edge crossing the surface, connect the
+//            4 cells sharing that edge with a quad.
+//   Phase 3: Laplacian relaxation smooths vertex positions.
+//   Phase 4: Compute smooth normals from face geometry.
+//
+// Produces rounded, organic-looking surfaces. The key insight:
+// one vertex per surface cell → vertices are automatically shared
+// → normals are automatically smooth. No stairstepping.
+// ═══════════════════════════════════════════════════════════════
+
+/// Generate a smooth mesh using Surface Nets.
+/// Produces rounded surfaces instead of blocky voxel cubes.
+pub fn generate_mesh_smooth(
+    voxels: &[Voxel],
+    size: usize,
+    offset: Vec3,
+    scale: f32,
+) -> ChunkMesh {
+    let mut mesh = ChunkMesh::new();
+    let s = size as i32;
+
+    let get = |x: i32, y: i32, z: i32| -> Voxel {
+        if x < 0 || y < 0 || z < 0 || x >= s || y >= s || z >= s {
+            return Voxel::empty();
+        }
+        voxels[(z as usize) * size * size + (y as usize) * size + (x as usize)]
+    };
+    let solid = |x: i32, y: i32, z: i32| -> bool { get(x, y, z).is_solid() };
+
+    // Phase 1: Place one vertex per surface cell
+    // A cell at (cx, cy, cz) has 8 corners at positions cx..cx+1, cy..cy+1, cz..cz+1
+    let cs = s - 1; // cell grid goes 0..cs-1
+    // Vertex index grid: u32::MAX means "no vertex here"
+    let mut vi_grid: Vec<u32> = vec![u32::MAX; size * size * size];
+
+    let corner_offsets: [(i32, i32, i32); 8] = [
+        (0,0,0), (1,0,0), (1,1,0), (0,1,0),
+        (0,0,1), (1,0,1), (1,1,1), (0,1,1),
+    ];
+
+    // 12 edges of a cube (pairs of corner indices)
+    let edges: [(usize, usize); 12] = [
+        (0,1), (1,2), (2,3), (3,0), // bottom face
+        (4,5), (5,6), (6,7), (7,4), // top face
+        (0,4), (1,5), (2,6), (3,7), // vertical edges
+    ];
+
+    for cz in 0..cs {
+        for cy in 0..cs {
+            for cx in 0..cs {
+                // Sample 8 corners
+                let mut mask: u8 = 0;
+                let mut corner_solid = [false; 8];
+                for (i, &(dx, dy, dz)) in corner_offsets.iter().enumerate() {
+                    let is_solid = solid(cx + dx, cy + dy, cz + dz);
+                    corner_solid[i] = is_solid;
+                    if is_solid { mask |= 1 << i; }
+                }
+
+                // Skip cells entirely inside or outside the surface
+                if mask == 0 || mask == 255 { continue; }
+
+                // Average edge crossing positions
+                let mut avg_x = 0.0f32;
+                let mut avg_y = 0.0f32;
+                let mut avg_z = 0.0f32;
+                let mut count = 0u32;
+                let mut color_r = 0u32;
+                let mut color_g = 0u32;
+                let mut color_b = 0u32;
+
+                for &(a, b) in &edges {
+                    if corner_solid[a] != corner_solid[b] {
+                        let pa = corner_offsets[a];
+                        let pb = corner_offsets[b];
+                        avg_x += (pa.0 + pb.0) as f32 * 0.5;
+                        avg_y += (pa.1 + pb.1) as f32 * 0.5;
+                        avg_z += (pa.2 + pb.2) as f32 * 0.5;
+                        count += 1;
+
+                        // Color from the solid side
+                        let so = if corner_solid[a] { pa } else { pb };
+                        let v = get(cx + so.0, cy + so.1, cz + so.2);
+                        let c = voxel_to_color(v);
+                        color_r += (c[0] * 255.0) as u32;
+                        color_g += (c[1] * 255.0) as u32;
+                        color_b += (c[2] * 255.0) as u32;
+                    }
+                }
+
+                if count == 0 { continue; }
+
+                let inv = 1.0 / count as f32;
+                let pos = Vec3::new(
+                    (cx as f32 + avg_x * inv) * scale + offset.x,
+                    (cy as f32 + avg_y * inv) * scale + offset.y,
+                    (cz as f32 + avg_z * inv) * scale + offset.z,
+                );
+
+                let color = [
+                    color_r as f32 * inv / 255.0,
+                    color_g as f32 * inv / 255.0,
+                    color_b as f32 * inv / 255.0,
+                    1.0,
+                ];
+
+                // Material from nearest solid corner
+                let mat = {
+                    let mut m = 0u8;
+                    for &(dx, dy, dz) in &corner_offsets {
+                        let v = get(cx + dx, cy + dy, cz + dz);
+                        if v.is_solid() { m = (v.packed & 0xFF) as u8; break; }
+                    }
+                    m
+                };
+
+                let idx = mesh.vertices.len() as u32;
+                vi_grid[cz as usize * size * size + cy as usize * size + cx as usize] = idx;
+
+                mesh.vertices.push(MeshVertex {
+                    position: [pos.x, pos.y, pos.z],
+                    normal: [0.0, 0.0, 0.0], // computed in Phase 4
+                    color,
+                    material: mat,
+                });
+            }
+        }
+    }
+
+    // Phase 2: Emit quads for each surface-crossing edge
+    let cell_vi = |cx: i32, cy: i32, cz: i32| -> Option<u32> {
+        if cx < 0 || cy < 0 || cz < 0 || cx >= cs || cy >= cs || cz >= cs {
+            return None;
+        }
+        let idx = vi_grid[cz as usize * size * size + cy as usize * size + cx as usize];
+        if idx == u32::MAX { None } else { Some(idx) }
+    };
+
+    // X-edges: from (x,y,z) to (x+1,y,z)
+    // Shared by cells: (x, y-1, z-1), (x, y, z-1), (x, y, z), (x, y-1, z)
+    for z in 0..s {
+        for y in 0..s {
+            for x in 0..s - 1 {
+                if solid(x, y, z) == solid(x + 1, y, z) { continue; }
+                let v0 = cell_vi(x, y - 1, z - 1);
+                let v1 = cell_vi(x, y,     z - 1);
+                let v2 = cell_vi(x, y,     z);
+                let v3 = cell_vi(x, y - 1, z);
+                if let (Some(a), Some(b), Some(c), Some(d)) = (v0, v1, v2, v3) {
+                    if solid(x + 1, y, z) {
+                        emit_quad(&mut mesh, d, c, b, a);
+                    } else {
+                        emit_quad(&mut mesh, a, b, c, d);
+                    }
+                }
+            }
+        }
+    }
+
+    // Y-edges: from (x,y,z) to (x,y+1,z)
+    // Shared by cells: (x-1, y, z-1), (x, y, z-1), (x, y, z), (x-1, y, z)
+    for z in 0..s {
+        for y in 0..s - 1 {
+            for x in 0..s {
+                if solid(x, y, z) == solid(x, y + 1, z) { continue; }
+                let v0 = cell_vi(x - 1, y, z - 1);
+                let v1 = cell_vi(x,     y, z - 1);
+                let v2 = cell_vi(x,     y, z);
+                let v3 = cell_vi(x - 1, y, z);
+                if let (Some(a), Some(b), Some(c), Some(d)) = (v0, v1, v2, v3) {
+                    if solid(x, y + 1, z) {
+                        emit_quad(&mut mesh, a, b, c, d);
+                    } else {
+                        emit_quad(&mut mesh, d, c, b, a);
+                    }
+                }
+            }
+        }
+    }
+
+    // Z-edges: from (x,y,z) to (x,y,z+1)
+    // Shared by cells: (x-1, y-1, z), (x, y-1, z), (x, y, z), (x-1, y, z)
+    for z in 0..s - 1 {
+        for y in 0..s {
+            for x in 0..s {
+                if solid(x, y, z) == solid(x, y, z + 1) { continue; }
+                let v0 = cell_vi(x - 1, y - 1, z);
+                let v1 = cell_vi(x,     y - 1, z);
+                let v2 = cell_vi(x,     y,     z);
+                let v3 = cell_vi(x - 1, y,     z);
+                if let (Some(a), Some(b), Some(c), Some(d)) = (v0, v1, v2, v3) {
+                    if solid(x, y, z + 1) {
+                        emit_quad(&mut mesh, d, c, b, a);
+                    } else {
+                        emit_quad(&mut mesh, a, b, c, d);
+                    }
+                }
+            }
+        }
+    }
+
+    // Phase 3: Laplacian relaxation (smooth vertex positions)
+    relax_vertices(&mut mesh, 2);
+
+    // Phase 4: Compute smooth normals from face geometry
+    compute_smooth_normals(&mut mesh);
+
+    mesh
+}
+
+/// Emit a quad as two triangles
+fn emit_quad(mesh: &mut ChunkMesh, a: u32, b: u32, c: u32, d: u32) {
+    mesh.indices.push(a);
+    mesh.indices.push(b);
+    mesh.indices.push(c);
+    mesh.indices.push(a);
+    mesh.indices.push(c);
+    mesh.indices.push(d);
+    mesh.triangle_count += 2;
+}
+
+/// Laplacian relaxation: move each vertex toward the average of its neighbors.
+/// Conservative blend preserves shape while removing stairstepping.
+fn relax_vertices(mesh: &mut ChunkMesh, iterations: u32) {
+    let n = mesh.vertices.len();
+    if n == 0 { return; }
+
+    // Build adjacency from triangle indices
+    let mut neighbors: Vec<Vec<u32>> = vec![Vec::new(); n];
+    for tri in mesh.indices.chunks(3) {
+        if tri.len() < 3 { continue; }
+        for i in 0..3 {
+            let a = tri[i] as usize;
+            let b = tri[(i + 1) % 3] as usize;
+            if !neighbors[a].contains(&(b as u32)) { neighbors[a].push(b as u32); }
+            if !neighbors[b].contains(&(a as u32)) { neighbors[b].push(a as u32); }
+        }
+    }
+
+    for _ in 0..iterations {
+        let old_pos: Vec<[f32; 3]> = mesh.vertices.iter().map(|v| v.position).collect();
+        for i in 0..n {
+            if neighbors[i].is_empty() { continue; }
+            let mut avg = Vec3::ZERO;
+            for &j in &neighbors[i] {
+                let p = old_pos[j as usize];
+                avg += Vec3::new(p[0], p[1], p[2]);
+            }
+            avg /= neighbors[i].len() as f32;
+            // 60% original, 40% neighbor average — conservative smoothing
+            let orig = Vec3::new(old_pos[i][0], old_pos[i][1], old_pos[i][2]);
+            let smoothed = orig * 0.6 + avg * 0.4;
+            mesh.vertices[i].position = [smoothed.x, smoothed.y, smoothed.z];
+        }
+    }
+}
+
+/// Compute per-vertex normals by accumulating face normals
+fn compute_smooth_normals(mesh: &mut ChunkMesh) {
+    let n = mesh.vertices.len();
+    if n == 0 { return; }
+
+    let mut normals = vec![Vec3::ZERO; n];
+
+    for tri in mesh.indices.chunks(3) {
+        if tri.len() < 3 { continue; }
+        let p0 = Vec3::from(mesh.vertices[tri[0] as usize].position);
+        let p1 = Vec3::from(mesh.vertices[tri[1] as usize].position);
+        let p2 = Vec3::from(mesh.vertices[tri[2] as usize].position);
+        let face_normal = (p1 - p0).cross(p2 - p0);
+        // Weight by face area (magnitude of cross product = 2× area)
+        normals[tri[0] as usize] += face_normal;
+        normals[tri[1] as usize] += face_normal;
+        normals[tri[2] as usize] += face_normal;
+    }
+
+    for (i, v) in mesh.vertices.iter_mut().enumerate() {
+        let n = normals[i].normalize_or_zero();
+        v.normal = [n.x, n.y, n.z];
+    }
+}
+
+/// Smooth mesh with per-vertex AO from voxel neighborhood
+pub fn generate_mesh_smooth_with_ao(
+    voxels: &[Voxel],
+    size: usize,
+    offset: Vec3,
+    scale: f32,
+) -> ChunkMesh {
+    let mut mesh = generate_mesh_smooth(voxels, size, offset, scale);
+
+    // Compute AO for each vertex based on voxel neighborhood
+    for v in mesh.vertices.iter_mut() {
+        let vx = ((v.position[0] - offset.x) / scale) as i32;
+        let vy = ((v.position[1] - offset.y) / scale) as i32;
+        let vz = ((v.position[2] - offset.z) / scale) as i32;
+        let ao = compute_ao(voxels, size, vx, vy, vz, v.normal);
+        v.color[0] *= ao;
+        v.color[1] *= ao;
+        v.color[2] *= ao;
+    }
+
+    mesh
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -282,6 +594,65 @@ mod tests {
         println!("Min vertex brightness after AO: {:.3}", min_brightness);
         // Corner vertices should be darker
         assert!(min_brightness < 0.75);
+    }
+
+    #[test]
+    fn test_smooth_mesh_basic() {
+        let voxels = make_test_chunk(16);
+        let mesh = generate_mesh_smooth(&voxels, 16, Vec3::ZERO, 1.0);
+
+        println!("Smooth 16³ with 8³ cube: {} triangles, {} vertices",
+            mesh.triangle_count, mesh.vertices.len());
+
+        assert!(mesh.triangle_count > 0);
+        // Surface Nets produces fewer triangles than sharp meshing (shared vertices)
+        assert!(mesh.vertices.len() > 0);
+    }
+
+    #[test]
+    fn test_smooth_mesh_sphere() {
+        // Create a sphere — this is where smooth shines
+        let size = 32;
+        let mut voxels = vec![Voxel::empty(); size * size * size];
+        let center = size as f32 / 2.0;
+        let radius = size as f32 / 4.0;
+        for z in 0..size { for y in 0..size { for x in 0..size {
+            let dx = x as f32 - center;
+            let dy = y as f32 - center;
+            let dz = z as f32 - center;
+            if dx*dx + dy*dy + dz*dz <= radius * radius {
+                voxels[z * size * size + y * size + x] = Voxel::solid(1, 200, 100, 50);
+            }
+        }}}
+
+        let mesh = generate_mesh_smooth(&voxels, size, Vec3::ZERO, 1.0);
+        println!("Smooth sphere (r={}): {} triangles, {} vertices",
+            radius as i32, mesh.triangle_count, mesh.vertices.len());
+
+        // Verify normals point outward (dot with direction from center should be positive)
+        let mut outward_count = 0;
+        for v in &mesh.vertices {
+            let pos = Vec3::from(v.position);
+            let to_center = Vec3::splat(center) - pos;
+            let normal = Vec3::from(v.normal);
+            if normal.dot(to_center) < 0.0 { outward_count += 1; }
+        }
+        let ratio = outward_count as f32 / mesh.vertices.len() as f32;
+        println!("Normals pointing outward: {:.0}%", ratio * 100.0);
+        assert!(ratio > 0.8); // most normals should point outward
+    }
+
+    #[test]
+    fn test_smooth_with_ao() {
+        let voxels = make_test_chunk(16);
+        let mesh = generate_mesh_smooth_with_ao(&voxels, 16, Vec3::ZERO, 1.0);
+
+        assert!(mesh.triangle_count > 0);
+        // AO should darken some vertices
+        let min_brightness: f32 = mesh.vertices.iter()
+            .map(|v| v.color[0])
+            .fold(f32::MAX, f32::min);
+        println!("Smooth AO min brightness: {:.3}", min_brightness);
     }
 
     #[test]
