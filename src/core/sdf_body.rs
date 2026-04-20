@@ -499,6 +499,634 @@ impl SdfBody {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// PREFAB: CHIBI CAT body from Seedream 4.5 voxel references.
+// Orange tabby with oversized head, tiny body, short legs,
+// big green eyes. See Cat/ reference images.
+// ═══════════════════════════════════════════════════════════════
+
+impl SdfBody {
+    /// Chibi cat body (orange tabby) built from cat skeleton positions.
+    /// Call skeleton.solve_forward() BEFORE this.
+    /// Expects Skeleton::cat() layout — 26 bones.
+    pub fn chibi_cat_body(sk: &Skeleton, scale: f32) -> Self {
+        let mut body = SdfBody::new();
+        let s = scale;
+        let b = 2.0 * s;  // blend radius — generous for chibi softness
+
+        // Palette from references
+        let orange:  [u8; 3] = [225, 135, 55];    // base tabby
+        let cream:   [u8; 3] = [248, 225, 185];   // belly / chest / chin / paw tips
+        let stripe:  [u8; 3] = [165, 85, 30];     // darker stripes
+        let pink:    [u8; 3] = [240, 160, 170];   // nose, inner ears
+        let green:   [u8; 3] = [75, 215, 95];     // eyes
+        let dark:    [u8; 3] = [30, 25, 30];      // pupils / pads / nose tip
+        let white:   [u8; 3] = [250, 250, 250];   // eye highlights / whiskers
+
+        // Bone positions
+        let pelvis  = sk.bone("pelvis").world_position;
+        let s1e     = sk.bone("spine1").world_end_position;
+        let s2s     = sk.bone("spine2").world_position;
+        let s2e     = sk.bone("spine2").world_end_position;
+        let neck_s  = sk.bone("neck").world_position;
+        let neck_e  = sk.bone("neck").world_end_position;
+        let head_s  = sk.bone("head").world_position;
+        let head_e  = sk.bone("head").world_end_position;
+
+        // ─── BIG CHIBI HEAD — placed FORWARD of the neck ──────
+        // Key fix: head_center pushed past head_e, not at mid-bone,
+        // so the head sits clearly AHEAD of the shoulders.
+        let head_center = head_e + Vec3::new(0.0, -0.5*s, 1.5*s);
+        let forehead   = head_center + Vec3::new(0.0, 2.2*s, -0.3*s);
+        let muzzle     = head_center + Vec3::new(0.0, -3.0*s, 4.2*s);
+        let chin       = muzzle + Vec3::new(0.0, -1.0*s, -0.8*s);
+        {
+            let mut h = SdfShape::new("cat_head", 5, orange);
+            // Main cranium — round-ish sphere
+            h.add(SdfPrimitive::Ellipsoid {
+                center: head_center,
+                radii: Vec3::new(6.5*s, 5.8*s, 6.5*s),
+            }, 0.0);
+            // Forehead bulge (makes head read "chibi")
+            h.add(SdfPrimitive::Sphere { center: forehead, radius: 3.0*s }, b);
+            // Cheek puffs
+            h.add(SdfPrimitive::Sphere {
+                center: head_center + Vec3::new(-4.0*s, -0.8*s, 2.0*s), radius: 2.3*s,
+            }, b);
+            h.add(SdfPrimitive::Sphere {
+                center: head_center + Vec3::new(4.0*s, -0.8*s, 2.0*s), radius: 2.3*s,
+            }, b);
+            // Muzzle / short snout (sticks out of the face, not the body)
+            h.add(SdfPrimitive::Ellipsoid {
+                center: muzzle,
+                radii: Vec3::new(2.3*s, 1.5*s, 1.8*s),
+            }, b);
+            body.add_shape(h);
+        }
+
+        // ─── Cream face mask (chin + muzzle + around mouth) ──
+        {
+            let mut m = SdfShape::new("cat_face_cream", 5, cream);
+            m.add(SdfPrimitive::Ellipsoid {
+                center: muzzle + Vec3::new(0.0, -0.5*s, -0.3*s),
+                radii: Vec3::new(3.2*s, 1.8*s, 2.2*s),
+            }, 0.0);
+            m.add(SdfPrimitive::Sphere { center: chin, radius: 2.2*s }, b);
+            body.add_shape(m);
+        }
+
+        // ─── EARS — triangular tufts pointing up ─────────────
+        let ear_l_base = head_center + Vec3::new(-3.5*s, 4.5*s, -0.5*s);
+        let ear_l_tip  = head_center + Vec3::new(-4.2*s, 8.0*s, -1.0*s);
+        let ear_r_base = head_center + Vec3::new(3.5*s, 4.5*s, -0.5*s);
+        let ear_r_tip  = head_center + Vec3::new(4.2*s, 8.0*s, -1.0*s);
+        {
+            let mut e = SdfShape::new("cat_ears", 5, orange);
+            e.add(SdfPrimitive::Capsule { a: ear_l_base, b: ear_l_tip, radius: 1.6*s }, 0.0);
+            e.add(SdfPrimitive::Capsule { a: ear_r_base, b: ear_r_tip, radius: 1.6*s }, 0.0);
+            body.add_shape(e);
+        }
+        // Pink ear interiors
+        {
+            let mut ei = SdfShape::new("cat_ear_inner", 5, pink);
+            ei.add(SdfPrimitive::Capsule {
+                a: ear_l_base + Vec3::new(0.0, 1.0*s, 0.5*s),
+                b: ear_l_tip + Vec3::new(0.0, -0.5*s, 0.5*s),
+                radius: 0.8*s,
+            }, 0.0);
+            ei.add(SdfPrimitive::Capsule {
+                a: ear_r_base + Vec3::new(0.0, 1.0*s, 0.5*s),
+                b: ear_r_tip + Vec3::new(0.0, -0.5*s, 0.5*s),
+                radius: 0.8*s,
+            }, 0.0);
+            body.add_shape(ei);
+        }
+
+        // ─── HUGE GREEN EYES ──────────────────────────────────
+        let eye_l = head_center + Vec3::new(-2.5*s, 1.0*s, 5.0*s);
+        let eye_r = head_center + Vec3::new(2.5*s, 1.0*s, 5.0*s);
+        {
+            let mut ey = SdfShape::new("cat_eyes", 5, green);
+            ey.add(SdfPrimitive::Sphere { center: eye_l, radius: 2.2*s }, 0.0);
+            ey.add(SdfPrimitive::Sphere { center: eye_r, radius: 2.2*s }, 0.0);
+            body.add_shape(ey);
+        }
+        // Pupils — dark vertical slits (thin ellipsoids)
+        {
+            let mut pu = SdfShape::new("cat_pupils", 5, dark);
+            pu.add(SdfPrimitive::Ellipsoid {
+                center: eye_l + Vec3::new(0.0, 0.0, 0.8*s),
+                radii: Vec3::new(0.4*s, 1.5*s, 0.6*s),
+            }, 0.0);
+            pu.add(SdfPrimitive::Ellipsoid {
+                center: eye_r + Vec3::new(0.0, 0.0, 0.8*s),
+                radii: Vec3::new(0.4*s, 1.5*s, 0.6*s),
+            }, 0.0);
+            body.add_shape(pu);
+        }
+        // White highlight dots in eyes
+        {
+            let mut hl = SdfShape::new("cat_eye_highlight", 5, white);
+            hl.add(SdfPrimitive::Sphere {
+                center: eye_l + Vec3::new(-0.7*s, 0.7*s, 1.3*s), radius: 0.5*s,
+            }, 0.0);
+            hl.add(SdfPrimitive::Sphere {
+                center: eye_r + Vec3::new(-0.7*s, 0.7*s, 1.3*s), radius: 0.5*s,
+            }, 0.0);
+            body.add_shape(hl);
+        }
+
+        // ─── PINK TRIANGLE NOSE ───────────────────────────────
+        {
+            let mut n = SdfShape::new("cat_nose", 5, pink);
+            n.add(SdfPrimitive::Ellipsoid {
+                center: muzzle + Vec3::new(0.0, 0.8*s, 1.5*s),
+                radii: Vec3::new(0.7*s, 0.5*s, 0.4*s),
+            }, 0.0);
+            body.add_shape(n);
+        }
+
+        // ─── TORSO — compact chubby body ─────────────────────
+        // Cat is quadrupedal: spine1+spine2 stretch along Z from pelvis to chest.
+        let torso_mid = (pelvis + s2e) * 0.5;
+        {
+            let mut t = SdfShape::new("cat_body", 5, orange);
+            // Pelvis (rear)
+            t.add(SdfPrimitive::Ellipsoid {
+                center: pelvis,
+                radii: Vec3::new(4.5*s, 4.0*s, 4.5*s),
+            }, 0.0);
+            // Middle back
+            t.add(SdfPrimitive::Ellipsoid {
+                center: torso_mid,
+                radii: Vec3::new(4.0*s, 3.8*s, 5.0*s),
+            }, b);
+            // Front shoulders (at spine2 end, where neck starts)
+            t.add(SdfPrimitive::Ellipsoid {
+                center: s2e,
+                radii: Vec3::new(4.2*s, 4.0*s, 4.0*s),
+            }, b);
+            // Neck — short stubby
+            t.add(SdfPrimitive::Capsule { a: neck_s, b: neck_e, radius: 3.0*s }, b);
+            body.add_shape(t);
+        }
+
+        // ─── CREAM BELLY / CHEST ──────────────────────────────
+        {
+            let mut bl = SdfShape::new("cat_belly", 5, cream);
+            bl.add(SdfPrimitive::Ellipsoid {
+                center: torso_mid + Vec3::new(0.0, -2.0*s, 0.0),
+                radii: Vec3::new(3.2*s, 2.0*s, 4.8*s),
+            }, 0.0);
+            // Chest bib
+            bl.add(SdfPrimitive::Sphere {
+                center: neck_s + Vec3::new(0.0, -1.5*s, -1.0*s),
+                radius: 2.8*s,
+            }, b);
+            body.add_shape(bl);
+        }
+
+        // ─── TABBY STRIPES (dark orange capsules along spine) ─
+        {
+            let mut st = SdfShape::new("cat_stripes", 5, stripe);
+            // Spine stripe (dorsal) — pelvis → neck
+            st.add(SdfPrimitive::Capsule {
+                a: pelvis + Vec3::new(0.0, 3.8*s, 0.0),
+                b: s2e + Vec3::new(0.0, 3.8*s, 0.0),
+                radius: 0.7*s,
+            }, 0.0);
+            // 4 ring-stripes across back (short capsules perpendicular to spine)
+            for (i, &zf) in [0.2_f32, 0.45, 0.7, 0.95].iter().enumerate() {
+                let along = pelvis + (s2e - pelvis) * zf;
+                let h_off = 3.2*s;
+                st.add(SdfPrimitive::Capsule {
+                    a: along + Vec3::new(-3.5*s, h_off, 0.0),
+                    b: along + Vec3::new(3.5*s, h_off, 0.0),
+                    radius: 0.6*s,
+                }, 0.0);
+                let _ = i;
+            }
+            // Forehead M-mark (tabby signature)
+            st.add(SdfPrimitive::Capsule {
+                a: forehead + Vec3::new(-1.8*s, 0.5*s, 2.8*s),
+                b: forehead + Vec3::new(-0.5*s, -1.5*s, 3.5*s),
+                radius: 0.45*s,
+            }, 0.0);
+            st.add(SdfPrimitive::Capsule {
+                a: forehead + Vec3::new(1.8*s, 0.5*s, 2.8*s),
+                b: forehead + Vec3::new(0.5*s, -1.5*s, 3.5*s),
+                radius: 0.45*s,
+            }, 0.0);
+            // Cheek whisker marks (3 per side)
+            for side in [-1.0_f32, 1.0] {
+                for row in 0..3 {
+                    let y = -0.3 - row as f32 * 0.7;
+                    st.add(SdfPrimitive::Capsule {
+                        a: head_center + Vec3::new(side * 3.0*s, y*s, 5.0*s),
+                        b: head_center + Vec3::new(side * 5.5*s, y*s, 4.0*s),
+                        radius: 0.3*s,
+                    }, 0.0);
+                }
+            }
+            body.add_shape(st);
+        }
+
+        // ─── FOUR LEGS (short, stubby, orange) ────────────────
+        for leg_name in ["upper_arm_l", "upper_arm_r", "thigh_l", "thigh_r"] {
+            let hip = sk.bone(leg_name).world_position;
+            let knee = sk.bone(leg_name).world_end_position;
+            let (lower_name, paw_name) = match leg_name {
+                "upper_arm_l" => ("forearm_l", "paw_fl"),
+                "upper_arm_r" => ("forearm_r", "paw_fr"),
+                "thigh_l"     => ("shin_l", "paw_bl"),
+                "thigh_r"     => ("shin_r", "paw_br"),
+                _ => unreachable!(),
+            };
+            let lower_s = sk.bone(lower_name).world_position;
+            let lower_e = sk.bone(lower_name).world_end_position;
+            let paw_s   = sk.bone(paw_name).world_position;
+            let paw_e   = sk.bone(paw_name).world_end_position;
+
+            let mut leg = SdfShape::new("cat_leg", 5, orange);
+            // Upper leg (thigh/upper arm)
+            leg.add(SdfPrimitive::Capsule { a: hip, b: knee, radius: 2.2*s }, 0.0);
+            // Lower leg
+            leg.add(SdfPrimitive::Capsule { a: lower_s, b: lower_e, radius: 2.0*s }, b);
+            // Paw as rounded box
+            let paw_mid = (paw_s + paw_e) * 0.5;
+            leg.add(SdfPrimitive::RoundBox {
+                center: paw_mid,
+                half_extents: Vec3::new(1.6*s, 1.2*s, 1.8*s),
+                rounding: 1.0*s,
+            }, b);
+            body.add_shape(leg);
+        }
+
+        // Cream paw tips (all 4 paws)
+        {
+            let mut tips = SdfShape::new("cat_paw_tips", 5, cream);
+            for paw_name in ["paw_fl", "paw_fr", "paw_bl", "paw_br"] {
+                let paw_e = sk.bone(paw_name).world_end_position;
+                tips.add(SdfPrimitive::Sphere {
+                    center: paw_e + Vec3::new(0.0, 0.5*s, 0.5*s),
+                    radius: 1.4*s,
+                }, 0.0);
+            }
+            body.add_shape(tips);
+        }
+
+        // ─── TAIL (curved up, striped) ────────────────────────
+        {
+            let mut tl = SdfShape::new("cat_tail", 5, orange);
+            for seg in ["tail1", "tail2", "tail3", "tail4"] {
+                let a = sk.bone(seg).world_position;
+                let c = sk.bone(seg).world_end_position;
+                let r = match seg {
+                    "tail1" => 1.8*s, "tail2" => 1.6*s,
+                    "tail3" => 1.4*s, _       => 1.1*s,
+                };
+                tl.add(SdfPrimitive::Capsule { a, b: c, radius: r }, b * 0.5);
+            }
+            body.add_shape(tl);
+        }
+        // Tail tip (dark)
+        {
+            let mut tt = SdfShape::new("cat_tail_tip", 5, stripe);
+            let tip = sk.bone("tail4").world_end_position;
+            tt.add(SdfPrimitive::Sphere { center: tip, radius: 1.2*s }, 0.0);
+            body.add_shape(tt);
+        }
+
+        body
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PREFAB: CHIBI CAT boxed — MagicaVoxel style.
+// Only RoundBox primitives with rounding=0 (true cubes).
+// Proportions from Seedream 4.5 reference: square head, tiny body,
+// short pillar legs, thick tail. Large kawaii eyes as flat plates
+// on front face of head. Vertical stripes on sides.
+// ═══════════════════════════════════════════════════════════════
+
+impl SdfBody {
+    /// Chibi cat made entirely of axis-aligned cubes.
+    /// Use with `Skeleton::chibi_cat(scale)`. scale ~2-3 recommended.
+    /// Anchors: head/body/ears/tail are placed relative to pelvis.
+    /// Legs use paw world positions so walk animation shifts them.
+    pub fn chibi_cat_boxed(sk: &Skeleton, scale: f32) -> Self {
+        let mut body = SdfBody::new();
+        let s = scale;
+
+        // Palette (from Seedream references)
+        let orange: [u8; 3] = [235, 135, 55];
+        let cream:  [u8; 3] = [250, 230, 190];
+        let stripe: [u8; 3] = [155, 80, 30];
+        let pink:   [u8; 3] = [245, 170, 180];
+        let green:  [u8; 3] = [70, 210, 100];
+        let white:  [u8; 3] = [252, 252, 252];
+        let dark:   [u8; 3] = [25, 20, 25];
+
+        let pelvis = sk.bone("pelvis").world_position;
+
+        // ─── BODY: long block (cat is long!). 7*s in Z = ~17 voxels at scale 2.5
+        let spine2_end = sk.bone("spine2").world_end_position;
+        // Body lifts when spine arches (hiss): body_center.y follows spine arch
+        let arch_lift = (spine2_end.y - pelvis.y).max(0.0);
+        let body_center = pelvis + Vec3::new(0.0, 0.5*s + arch_lift * 0.5, 1.5*s);
+        let body_half = Vec3::new(2.3*s, 2.0*s + arch_lift * 0.5, 5.25*s);
+        {
+            let mut b = SdfShape::new("body", 5, orange);
+            b.add(SdfPrimitive::RoundBox {
+                center: body_center, half_extents: body_half, rounding: 0.0,
+            }, 0.0);
+            body.add_shape(b);
+        }
+
+        // Chest cream bib — big flat slab on front of body
+        {
+            let mut c = SdfShape::new("chest", 5, cream);
+            c.add(SdfPrimitive::RoundBox {
+                center: body_center + Vec3::new(0.0, -0.3*s, body_half.z - 0.3*s),
+                half_extents: Vec3::new(1.5*s, 1.6*s, 0.3*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(c);
+        }
+
+        // Vertical stripes on body sides
+        {
+            let mut st = SdfShape::new("body_stripes", 5, stripe);
+            for dz in [-2.5_f32, -1.0, 0.5, 1.8, 3.0] {
+                // left
+                st.add(SdfPrimitive::RoundBox {
+                    center: Vec3::new(body_center.x - body_half.x, body_center.y, body_center.z + dz*s),
+                    half_extents: Vec3::new(0.2*s, body_half.y - 0.3*s, 0.3*s),
+                    rounding: 0.0,
+                }, 0.0);
+                // right
+                st.add(SdfPrimitive::RoundBox {
+                    center: Vec3::new(body_center.x + body_half.x, body_center.y, body_center.z + dz*s),
+                    half_extents: Vec3::new(0.2*s, body_half.y - 0.3*s, 0.3*s),
+                    rounding: 0.0,
+                }, 0.0);
+            }
+            // Back stripes across the top (dorsal)
+            for dz in [-2.0_f32, -0.5, 1.0, 2.5] {
+                st.add(SdfPrimitive::RoundBox {
+                    center: Vec3::new(body_center.x, body_center.y + body_half.y, body_center.z + dz*s),
+                    half_extents: Vec3::new(body_half.x - 0.3*s, 0.2*s, 0.3*s),
+                    rounding: 0.0,
+                }, 0.0);
+            }
+            body.add_shape(st);
+        }
+
+        // ─── HEAD: big cube anchored to spine2_end (so spine arch lifts it)
+        let head_center = spine2_end + Vec3::new(0.0, 3.0*s, 2.0*s);
+        let head_half = Vec3::new(3.5*s, 3.3*s, 3.0*s);
+        {
+            let mut h = SdfShape::new("head", 5, orange);
+            h.add(SdfPrimitive::RoundBox {
+                center: head_center, half_extents: head_half, rounding: 0.0,
+            }, 0.0);
+            body.add_shape(h);
+        }
+
+        // ─── EARS: two triangular-ish pillars on top ─────────
+        let ear_half = Vec3::new(0.8*s, 1.5*s, 0.8*s);
+        for &dx in &[-2.3_f32, 2.3] {
+            let mut e = SdfShape::new("ear", 5, orange);
+            let c = Vec3::new(
+                head_center.x + dx*s,
+                head_center.y + head_half.y + ear_half.y - 0.2*s,
+                head_center.z - 0.3*s,
+            );
+            e.add(SdfPrimitive::RoundBox {
+                center: c, half_extents: ear_half, rounding: 0.0,
+            }, 0.0);
+            body.add_shape(e);
+            // Pink inner ear — smaller box in front
+            let mut ei = SdfShape::new("ear_inner", 5, pink);
+            ei.add(SdfPrimitive::RoundBox {
+                center: c + Vec3::new(0.0, -0.2*s, 0.4*s),
+                half_extents: Vec3::new(0.4*s, 0.9*s, 0.3*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(ei);
+        }
+
+        // ─── FACE: cream muzzle plate on lower half of front ─
+        let face_front = head_center.z + head_half.z;
+        {
+            let mut c = SdfShape::new("muzzle_cream", 5, cream);
+            c.add(SdfPrimitive::RoundBox {
+                center: Vec3::new(head_center.x, head_center.y - 1.6*s, face_front - 0.2*s),
+                half_extents: Vec3::new(1.8*s, 1.3*s, 0.4*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(c);
+        }
+
+        // ─── EYES: big green squares on upper front ──────────
+        let eye_half = Vec3::new(0.9*s, 1.1*s, 0.3*s);
+        let eye_y = head_center.y + 0.2*s;
+        for &dx in &[-1.5_f32, 1.5] {
+            let mut e = SdfShape::new("eye", 5, green);
+            let c = Vec3::new(head_center.x + dx*s, eye_y, face_front);
+            e.add(SdfPrimitive::RoundBox {
+                center: c, half_extents: eye_half, rounding: 0.0,
+            }, 0.0);
+            body.add_shape(e);
+        }
+        // Dark round pupils — centered on each eye
+        for &dx in &[-1.5_f32, 1.5] {
+            let mut p = SdfShape::new("pupil", 5, dark);
+            let c = Vec3::new(head_center.x + dx*s, eye_y, face_front + 0.2*s);
+            p.add(SdfPrimitive::RoundBox {
+                center: c,
+                half_extents: Vec3::new(0.35*s, 0.45*s, 0.2*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(p);
+        }
+        // White highlight dots in upper-outer corner of each eye
+        for &dx in &[-1.85_f32, 1.15] {
+            let mut h = SdfShape::new("hl", 5, white);
+            let c = Vec3::new(head_center.x + dx*s, eye_y + 0.7*s, face_front + 0.25*s);
+            h.add(SdfPrimitive::RoundBox {
+                center: c,
+                half_extents: Vec3::new(0.25*s, 0.25*s, 0.15*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(h);
+        }
+
+        // ─── NOSE: pink stub that sticks out forward ──────────
+        let nose_y = head_center.y - 0.9*s;
+        {
+            let mut n = SdfShape::new("nose", 5, pink);
+            n.add(SdfPrimitive::RoundBox {
+                center: Vec3::new(head_center.x, nose_y, face_front + 0.6*s),
+                half_extents: Vec3::new(0.45*s, 0.35*s, 0.6*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(n);
+        }
+        // Mouth — small dark line below nose
+        {
+            let mut m = SdfShape::new("mouth", 5, dark);
+            m.add(SdfPrimitive::RoundBox {
+                center: Vec3::new(head_center.x, nose_y - 0.7*s, face_front + 0.2*s),
+                half_extents: Vec3::new(0.5*s, 0.12*s, 0.18*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(m);
+        }
+        // Whiskers — 3 horizontal strips on each side from nose level
+        {
+            let mut w = SdfShape::new("whiskers", 5, white);
+            for &side in &[-1.0_f32, 1.0] {
+                for row in 0..3 {
+                    let dy = -0.3 + row as f32 * 0.4; // -0.3, 0.1, 0.5
+                    w.add(SdfPrimitive::RoundBox {
+                        center: Vec3::new(
+                            head_center.x + side * (1.6*s),
+                            nose_y + dy*s,
+                            face_front + 0.15*s,
+                        ),
+                        half_extents: Vec3::new(1.4*s, 0.1*s, 0.1*s),
+                        rounding: 0.0,
+                    }, 0.0);
+                }
+            }
+            body.add_shape(w);
+        }
+
+        // ─── FOREHEAD M-MARK (tabby signature stripes) ───────
+        {
+            let mut m = SdfShape::new("m_mark", 5, stripe);
+            for &dx in &[-1.3_f32, 0.0, 1.3] {
+                m.add(SdfPrimitive::RoundBox {
+                    center: Vec3::new(head_center.x + dx*s, head_center.y + 2.3*s, face_front - 0.1*s),
+                    half_extents: Vec3::new(0.22*s, 0.8*s, 0.2*s),
+                    rounding: 0.0,
+                }, 0.0);
+            }
+            // Cheek whisker stripes (3 per side)
+            for &side in &[-1.0_f32, 1.0] {
+                for row in 0..3 {
+                    let y = -0.5 - row as f32 * 0.5;
+                    m.add(SdfPrimitive::RoundBox {
+                        center: Vec3::new(
+                            head_center.x + side * (head_half.x - 0.3*s),
+                            head_center.y + y*s,
+                            face_front - 0.3*s,
+                        ),
+                        half_extents: Vec3::new(0.2*s, 0.18*s, 0.25*s),
+                        rounding: 0.0,
+                    }, 0.0);
+                }
+            }
+            body.add_shape(m);
+        }
+
+        // ─── LEGS: 4 box-pillars from shoulder/hip to paw position.
+        // Top anchor = shoulder/hip world_end_position (sits directly above
+        // the paw in rest pose) — so legs are vertical columns by default.
+        // When swipe rotates upper_arm, paw moves forward → bbox stretches.
+        let leg_half_xz = 0.75 * s;
+        for (paw_name, anchor_name) in [
+            ("paw_fl", "shoulder_l"),
+            ("paw_fr", "shoulder_r"),
+            ("paw_bl", "hip_l"),
+            ("paw_br", "hip_r"),
+        ] {
+            let paw_e = sk.bone(paw_name).world_end_position;
+            let leg_top = sk.bone(anchor_name).world_end_position;
+            let center = (leg_top + paw_e) * 0.5;
+            let span = (paw_e - leg_top).abs();
+            let he = Vec3::new(
+                (span.x * 0.5 + leg_half_xz).max(leg_half_xz),
+                (span.y * 0.5).max(0.4*s),
+                (span.z * 0.5 + leg_half_xz).max(leg_half_xz),
+            );
+            let mut l = SdfShape::new("leg", 5, orange);
+            l.add(SdfPrimitive::RoundBox {
+                center, half_extents: he, rounding: 0.0,
+            }, 0.0);
+            body.add_shape(l);
+        }
+
+        // Cream paw pads (at paw end position — follows full animation)
+        for paw_name in ["paw_fl", "paw_fr", "paw_bl", "paw_br"] {
+            let paw_e = sk.bone(paw_name).world_end_position;
+            let mut p = SdfShape::new("pad", 5, cream);
+            p.add(SdfPrimitive::RoundBox {
+                center: paw_e + Vec3::new(0.0, 0.3*s, 0.0),
+                half_extents: Vec3::new(0.8*s, 0.3*s, 0.8*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(p);
+        }
+
+        // ─── TAIL: 4 segments following tail bone positions
+        // Each segment = bbox between bone start and end. This way the
+        // tail bends as bones rotate (wave from vertical to horizontal).
+        let tail_segs = [("tail1", 0.85_f32), ("tail2", 0.75), ("tail3", 0.65), ("tail4", 0.55)];
+        let mut tail_shape = SdfShape::new("tail", 5, orange);
+        for (name, thick) in tail_segs {
+            let a = sk.bone(name).world_position;
+            let b = sk.bone(name).world_end_position;
+            let center = (a + b) * 0.5;
+            let span = (b - a).abs();
+            // Half-extents: at least `thick*s` in each dim, plus span/2 for length axis
+            let he = Vec3::new(
+                (span.x * 0.5 + thick * s).max(thick * s),
+                (span.y * 0.5 + thick * s).max(thick * s),
+                (span.z * 0.5 + thick * s).max(thick * s),
+            );
+            tail_shape.add(SdfPrimitive::RoundBox {
+                center, half_extents: he, rounding: 0.0,
+            }, 0.0);
+        }
+        body.add_shape(tail_shape);
+        // Tail stripe rings — at midpoint of segments 1, 2, 3
+        {
+            let mut ts = SdfShape::new("tail_stripes", 5, stripe);
+            for name in ["tail1", "tail2", "tail3"] {
+                let a = sk.bone(name).world_position;
+                let b = sk.bone(name).world_end_position;
+                let mid = (a + b) * 0.5;
+                let span = (b - a).abs();
+                ts.add(SdfPrimitive::RoundBox {
+                    center: mid,
+                    half_extents: Vec3::new(
+                        (span.x * 0.5 + 0.85*s).max(0.85*s),
+                        (span.y * 0.5).max(0.0) + 0.25*s,
+                        (span.z * 0.5 + 0.85*s).max(0.85*s),
+                    ),
+                    rounding: 0.0,
+                }, 0.0);
+            }
+            body.add_shape(ts);
+        }
+        // Tail tip cream
+        {
+            let mut tt = SdfShape::new("tail_tip", 5, cream);
+            let tip = sk.bone("tail4").world_end_position;
+            tt.add(SdfPrimitive::RoundBox {
+                center: tip,
+                half_extents: Vec3::new(0.6*s, 0.6*s, 0.6*s),
+                rounding: 0.0,
+            }, 0.0);
+            body.add_shape(tt);
+        }
+
+        body
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // PREFAB: HUMAN SKULL from reference images
 // ═══════════════════════════════════════════════════════════════
 

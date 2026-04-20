@@ -369,6 +369,139 @@ impl Skeleton {
         sk
     }
 
+    /// Chibi BIPED cat — stands on two hind legs, two short front "arms".
+    /// Tuned for the Seedream reference: oversized round-square head,
+    /// short body, stubby limbs. Scale 1.0 ≈ ~22 unit tall character.
+    pub fn chibi_biped(scale: f32) -> Self {
+        let mut sk = Skeleton::new("pelvis");
+        let s = scale;
+
+        // Spine goes UP (humanoid stance)
+        sk.add_bone("spine", "pelvis", 2.0*s, Vec3::Y,
+            JointConstraint::BallSocket { cone_angle: 0.3, twist_min: -0.2, twist_max: 0.2 });
+        sk.add_bone("chest", "spine", 1.8*s, Vec3::Y,
+            JointConstraint::BallSocket { cone_angle: 0.3, twist_min: -0.2, twist_max: 0.2 });
+        sk.add_bone("neck", "chest", 0.8*s, Vec3::Y,
+            JointConstraint::BallSocket { cone_angle: 0.5, twist_min: -0.4, twist_max: 0.4 });
+        sk.add_bone("head", "neck", 1.5*s, Vec3::Y,
+            JointConstraint::BallSocket { cone_angle: 0.5, twist_min: -0.4, twist_max: 0.4 });
+
+        // Ears (direction-only, brick will be placed via parent + offset)
+        sk.add_bone("ear_l", "head", 1.0*s, Vec3::new(-0.3, 0.9, 0.0).normalize(),
+            JointConstraint::Free);
+        sk.add_bone("ear_r", "head", 1.0*s, Vec3::new(0.3, 0.9, 0.0).normalize(),
+            JointConstraint::Free);
+        sk.add_bone("jaw", "head", 0.5*s, Vec3::new(0.0, -0.5, 0.8).normalize(),
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 0.6 });
+
+        // Short cat-like front "arms" (hanging at sides)
+        sk.add_bone("shoulder_l", "chest", 1.4*s, Vec3::NEG_X, JointConstraint::Fixed);
+        sk.add_bone("upper_arm_l", "shoulder_l", 1.5*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.4, twist_min: -0.5, twist_max: 0.5 });
+        sk.add_bone("forearm_l", "upper_arm_l", 1.3*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 2.2 });
+        sk.add_bone("paw_fl", "forearm_l", 0.6*s, Vec3::NEG_Y, JointConstraint::Free);
+
+        sk.add_bone("shoulder_r", "chest", 1.4*s, Vec3::X, JointConstraint::Fixed);
+        sk.add_bone("upper_arm_r", "shoulder_r", 1.5*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.4, twist_min: -0.5, twist_max: 0.5 });
+        sk.add_bone("forearm_r", "upper_arm_r", 1.3*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 2.2 });
+        sk.add_bone("paw_fr", "forearm_r", 0.6*s, Vec3::NEG_Y, JointConstraint::Free);
+
+        // Hind legs — these are the support
+        sk.add_bone("hip_l", "pelvis", 1.0*s, Vec3::NEG_X, JointConstraint::Fixed);
+        sk.add_bone("thigh_l", "hip_l", 2.5*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("shin_l", "thigh_l", 2.5*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.087, max_angle: 2.3 });
+        sk.add_bone("foot_l", "shin_l", 0.8*s, Vec3::Z, JointConstraint::Free);
+
+        sk.add_bone("hip_r", "pelvis", 1.0*s, Vec3::X, JointConstraint::Fixed);
+        sk.add_bone("thigh_r", "hip_r", 2.5*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("shin_r", "thigh_r", 2.5*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.087, max_angle: 2.3 });
+        sk.add_bone("foot_r", "shin_r", 0.8*s, Vec3::Z, JointConstraint::Free);
+
+        // Tail — sticks out backward and curls up
+        sk.add_bone("tail1", "pelvis", 1.5*s, Vec3::new(0.0, 0.3, -0.9).normalize(),
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("tail2", "tail1", 1.2*s, Vec3::new(0.0, 0.5, -0.8).normalize(),
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("tail3", "tail2", 0.9*s, Vec3::new(0.0, 0.7, -0.7).normalize(),
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("tail4", "tail3", 0.7*s, Vec3::new(0.0, 0.8, -0.6).normalize(),
+            JointConstraint::Free);
+
+        sk
+    }
+
+    /// Chibi QUADRUPED cat — four legs, horizontal body, head at front.
+    /// Tuned for the Seedream reference: ~50% head, compact body, short legs.
+    /// Scale: 1.0 ≈ ~5 unit body length; at scale 4 → ~20 unit bbox cat.
+    pub fn chibi_cat(scale: f32) -> Self {
+        let mut sk = Skeleton::new("pelvis");
+        let s = scale;
+
+        // Short horizontal spine — body is compact
+        sk.add_bone("spine1", "pelvis", 1.5*s, Vec3::Z,
+            JointConstraint::BallSocket { cone_angle: 0.25, twist_min: -0.2, twist_max: 0.2 });
+        sk.add_bone("spine2", "spine1", 1.5*s, Vec3::Z,
+            JointConstraint::BallSocket { cone_angle: 0.25, twist_min: -0.2, twist_max: 0.2 });
+        // Short neck — tilts up slightly
+        sk.add_bone("neck", "spine2", 0.8*s, Vec3::new(0.0, 0.5, 0.7).normalize(),
+            JointConstraint::BallSocket { cone_angle: 0.6, twist_min: -0.4, twist_max: 0.4 });
+        // Head bone — orientation only; brick is placed forward/above
+        sk.add_bone("head", "neck", 1.0*s, Vec3::new(0.0, 0.2, 0.8).normalize(),
+            JointConstraint::BallSocket { cone_angle: 0.5, twist_min: -0.3, twist_max: 0.3 });
+
+        sk.add_bone("jaw", "head", 0.5*s, Vec3::new(0.0, -0.3, 0.8).normalize(),
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 0.5 });
+
+        // ── FRONT LEGS: SHORT stubby (cat stands on all 4, chibi proportions) ──
+        sk.add_bone("shoulder_l", "spine2", 0.7*s, Vec3::NEG_X, JointConstraint::Fixed);
+        sk.add_bone("upper_arm_l", "shoulder_l", 0.9*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("forearm_l", "upper_arm_l", 0.9*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 1.8 });
+        sk.add_bone("paw_fl", "forearm_l", 0.3*s, Vec3::NEG_Y, JointConstraint::Free);
+
+        sk.add_bone("shoulder_r", "spine2", 0.7*s, Vec3::X, JointConstraint::Fixed);
+        sk.add_bone("upper_arm_r", "shoulder_r", 0.9*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("forearm_r", "upper_arm_r", 0.9*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.0, max_angle: 1.8 });
+        sk.add_bone("paw_fr", "forearm_r", 0.3*s, Vec3::NEG_Y, JointConstraint::Free);
+
+        // ── BACK LEGS: similar size (cat walks level, no giraffe) ──
+        sk.add_bone("hip_l", "pelvis", 0.7*s, Vec3::NEG_X, JointConstraint::Fixed);
+        sk.add_bone("thigh_l", "hip_l", 1.0*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("shin_l", "thigh_l", 1.0*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.087, max_angle: 1.8 });
+        sk.add_bone("paw_bl", "shin_l", 0.3*s, Vec3::NEG_Y, JointConstraint::Free);
+
+        sk.add_bone("hip_r", "pelvis", 0.7*s, Vec3::X, JointConstraint::Fixed);
+        sk.add_bone("thigh_r", "hip_r", 1.0*s, Vec3::NEG_Y,
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("shin_r", "thigh_r", 1.0*s, Vec3::NEG_Y,
+            JointConstraint::Hinge { axis: Vec3::X, min_angle: 0.087, max_angle: 1.8 });
+        sk.add_bone("paw_br", "shin_r", 0.3*s, Vec3::NEG_Y, JointConstraint::Free);
+
+        // ── TAIL: curls up and back (chain of 4 segments) ──
+        sk.add_bone("tail1", "pelvis", 1.2*s, Vec3::new(0.0, 0.4, -0.9).normalize(),
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("tail2", "tail1", 1.0*s, Vec3::new(0.0, 0.6, -0.8).normalize(),
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("tail3", "tail2", 0.8*s, Vec3::new(0.0, 0.8, -0.6).normalize(),
+            JointConstraint::BallSocket { cone_angle: 1.0, twist_min: -0.3, twist_max: 0.3 });
+        sk.add_bone("tail4", "tail3", 0.6*s, Vec3::new(0.0, 0.9, -0.4).normalize(),
+            JointConstraint::Free);
+
+        sk
+    }
+
     /// Create a cat skeleton (26 bones)
     pub fn cat(scale: f32) -> Self {
         let mut sk = Skeleton::new("pelvis");
