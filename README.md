@@ -1,5 +1,7 @@
 # Prometheus Engine 🔥
 
+> ⏸ **ON HOLD (12 June 2026).** Focus shifted to Tanks of Thea (Godot 4 + C#). Resumption date — TBD.
+
 **Voxel engine with full destructibility, GPU raymarching, and procedural generation.**
 
 *"Code creates worlds."*
