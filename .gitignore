@@ -1,2 +1,5 @@
 /target
 /CatInApartment.exe
+
+# Debug screenshots from runtime tests
+/debug/

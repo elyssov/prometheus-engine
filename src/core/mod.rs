@@ -9,3 +9,4 @@ pub mod brick;
 pub mod cat;
 pub mod damage;
 pub mod apartment;
+pub mod voxobj;

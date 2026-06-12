@@ -180,7 +180,9 @@ pub fn create_mesh_pipeline(
         primitive: wgpu::PrimitiveState {
             topology: wgpu::PrimitiveTopology::TriangleList,
             front_face: wgpu::FrontFace::Ccw,
-            cull_mode: Some(wgpu::Face::Back), // backface culling = 50% less triangles to shade
+            // Culling disabled — the cat lives *inside* the apartment, so
+            // walls' outward-facing normals must not hide their inner surfaces.
+            cull_mode: None,
             ..Default::default()
         },
         depth_stencil: Some(wgpu::DepthStencilState {

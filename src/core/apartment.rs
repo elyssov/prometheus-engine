@@ -31,6 +31,11 @@ mod palette {
     pub const FLOOR_CARPET:  [u8; 3] = [125, 85, 80];
     pub const FLOOR_BATH:    [u8; 3] = [180, 200, 215];
     pub const WALL:          [u8; 3] = [236, 222, 200];
+    // Wallpaper: thin removable cosmetic layer.  Pattern uses two stripe
+    // colours to make it obviously different from the wall (a dusty rose
+    // and a soft sage) so peeling reveals the structural wall underneath.
+    pub const PAPER_A:       [u8; 3] = [205, 165, 165];
+    pub const PAPER_B:       [u8; 3] = [175, 195, 165];
     pub const WALL_KITCHEN:  [u8; 3] = [215, 230, 220];
     pub const WALL_BEDROOM:  [u8; 3] = [220, 215, 235];
     pub const WALL_BATH:     [u8; 3] = [195, 215, 225];
@@ -94,6 +99,7 @@ pub fn build_apartment() -> BrickModel {
     add_left_dividers(&mut m);
     add_right_dividers(&mut m);
     add_wall_tints(&mut m);
+    add_wallpaper(&mut m);
 
     add_bedroom_1(&mut m);
     add_bedroom_2(&mut m);
@@ -183,6 +189,18 @@ fn add_outer_walls(m: &mut BrickModel) {
     box_xyz(m, "entry_frame_t",
         Vec3::new(ex0 - 4.0, DOOR_HEIGHT, Z_MIN - WALL_THICK - 1.0),
         Vec3::new(ex1 + 4.0, DOOR_HEIGHT + 4.0, Z_MIN + 1.0), DOOR_FRAME);
+
+    // FRONT DOOR — the apartment's only outside-facing door.  Solid steel
+    // colour, thicker than interior doors, indestructible (excluded from
+    // breakable mark via the "front_door" prefix in main.rs).  Without
+    // this brick the entry gap reads as a window into the sky.
+    box_xyz(m, "front_door",
+        Vec3::new(ex0 + 1.0, 0.0, Z_MIN - WALL_THICK + 1.0),
+        Vec3::new(ex1 - 1.0, DOOR_HEIGHT, Z_MIN - 1.0), [80, 90, 110]);
+    // Door handle so it reads as a real door from inside.
+    box_xyz(m, "front_door_handle",
+        Vec3::new(ex0 + 6.0, 90.0, Z_MIN - WALL_THICK + 0.5),
+        Vec3::new(ex0 + 14.0, 100.0, Z_MIN - 0.5), [200, 175, 65]);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -625,11 +643,13 @@ fn add_kitchen(m: &mut BrickModel) {
     const Z0: f32 = 200.0;
     const Z1: f32 = 450.0;
 
-    // Fridge near corridor door (west side, back corner)
+    // Fridge near corridor door (west side, back corner).
+    // Door opens to the SOUTH — handle on the south face so it faces the
+    // kitchen interior, not the north wall.
     box_xyz(m, "kit_fridge", Vec3::new(X0+15.0, 0.0, Z1-70.0),
                              Vec3::new(X0+75.0, 180.0, Z1-10.0), FRIDGE);
-    box_xyz(m, "kit_fridge_h", Vec3::new(X0+75.0, 60.0, Z1-45.0),
-                               Vec3::new(X0+77.0, 130.0, Z1-40.0), METAL);
+    box_xyz(m, "kit_fridge_h", Vec3::new(X0+30.0, 60.0, Z1-72.0),
+                               Vec3::new(X0+35.0, 130.0, Z1-70.0), METAL);
 
     // Counter along back wall from fridge to east wall
     box_xyz(m, "kit_counter", Vec3::new(X0+75.0, 0.0, Z1-70.0),
@@ -753,4 +773,69 @@ fn add_entry_hall(m: &mut BrickModel) {
     // Ceiling lamp
     box_xyz(m, "eh_lamp", Vec3::new(X0+200.0, 235.0, 80.0),
                           Vec3::new(X0+220.0, CEILING_Y, 100.0), LAMP_SHADE);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WALLPAPER — thin breakable cosmetic layer over corridor walls.
+// Two-colour vertical stripe pattern (dusty rose + sage), 50 cm tall
+// each.  Brick names contain "_paper" so the breakable-marker tags
+// them as paper (1 hp) and the structural-shell exclusion lets them
+// through.  Stripped wallpaper reveals the structural wall behind it.
+// ═══════════════════════════════════════════════════════════════
+fn add_wallpaper(m: &mut BrickModel) {
+    use palette::*;
+    let strip_h = 50.0;
+    let n_strips = (CEILING_Y / strip_h).ceil() as i32;
+    let paper_thick = 2.0;          // 2 cm — thin, easy to peel
+
+    // West corridor wall: x = WEST_CORR, gaps for bath/bed-2/bed-1.
+    // Tile the wall along Z, skipping the gaps so the wallpaper doesn't
+    // float over the doorways.  Apply paper on BOTH sides of the wall.
+    let west_gaps: &[(f32, f32)] = &[(80.0, 160.0), (300.0, 380.0), (600.0, 680.0)];
+    paper_along_z(m, "wcwp", WEST_CORR, west_gaps, paper_thick, strip_h, n_strips);
+
+    let east_gaps: &[(f32, f32)] = &[(80.0, 160.0), (300.0, 380.0), (600.0, 680.0)];
+    paper_along_z(m, "ecwp", EAST_CORR, east_gaps, paper_thick, strip_h, n_strips);
+}
+
+/// Paste vertical paper stripes onto both sides of a Z-running wall at
+/// `x_centre`.  `gaps` lists (z0, z1) windows to skip (no paper over
+/// doorways).  Bricks are named `{label}_p{side}_{stripe_index}_seg{n}`
+/// so they are unique and easily filterable.
+fn paper_along_z(m: &mut BrickModel, label: &str, x_centre: f32,
+                 gaps: &[(f32, f32)], thick: f32, strip_h: f32, n_strips: i32)
+{
+    use palette::*;
+    let wall_half = WALL_THICK * 0.5;
+    // Two paper slabs, one on each side of the structural wall.
+    let sides = [
+        ("in",  x_centre - wall_half - thick, x_centre - wall_half),
+        ("out", x_centre + wall_half,         x_centre + wall_half + thick),
+    ];
+
+    for (side_label, x0, x1) in sides {
+        let mut seg_idx = 0;
+        let mut cursor = Z_MIN;
+        // Build a list of solid-Z segments by skipping each gap.
+        let mut runs: Vec<(f32, f32)> = Vec::new();
+        for &(gz0, gz1) in gaps {
+            if gz0 > cursor { runs.push((cursor, gz0)); }
+            cursor = gz1;
+        }
+        if cursor < Z_MAX { runs.push((cursor, Z_MAX)); }
+
+        for (z0, z1) in runs {
+            for s in 0..n_strips {
+                let y0 = s as f32 * strip_h;
+                let y1 = ((s + 1) as f32 * strip_h).min(CEILING_Y);
+                let color = if s % 2 == 0 { PAPER_A } else { PAPER_B };
+                box_xyz(m,
+                    &format!("{}_paper_{}_seg{}_s{}", label, side_label, seg_idx, s),
+                    Vec3::new(x0, y0, z0),
+                    Vec3::new(x1, y1, z1),
+                    color);
+            }
+            seg_idx += 1;
+        }
+    }
 }

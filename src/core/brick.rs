@@ -50,6 +50,10 @@ pub struct Brick {
     pub visible: bool,
     /// Counts down to 0 after a hit; tints the brick red while > 0.
     pub flash_t: f32,
+
+    /// Vertical velocity for simple gravity simulation.  When a brick loses
+    /// its supporting bricks, this becomes negative and the brick falls.
+    pub vy: f32,
 }
 
 impl Brick {
@@ -66,6 +70,7 @@ impl Brick {
             durability: None,
             visible: true,
             flash_t: 0.0,
+            vy: 0.0,
         }
     }
 
