@@ -162,6 +162,13 @@ impl Skeleton {
         });
     }
 
+    /// True if a bone with this name exists. Callers that take user- or AI-supplied
+    /// names MUST check this first: the name-indexed accessors below index a HashMap,
+    /// which panics (aborting the process) on a missing key.
+    pub fn has_bone(&self, name: &str) -> bool {
+        self.name_to_id.contains_key(name)
+    }
+
     /// Get bone by name
     pub fn bone(&self, name: &str) -> &Bone {
         &self.bones[self.name_to_id[name] as usize]

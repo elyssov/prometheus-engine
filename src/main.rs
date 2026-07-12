@@ -1611,6 +1611,12 @@ fn mark_apartment_breakables(apt: &mut BrickModel) {
            || lname.contains("baseboard") {
             continue;
         }
+        // Preserve bricks whose durability was deliberately tuned elsewhere (e.g. the
+        // reinforced doors from close_some_doors, ~5 swipes to bust through). The
+        // generic material pass below must not silently downgrade them to wood (3 hp).
+        if b.durability.is_some() {
+            continue;
+        }
         let (dur, tag) = if lname.contains("bulb") || lname.contains("mirror")
                   || lname.contains("tv_screen") || lname.contains("window")
                   || lname.contains("vase") || lname.contains("glass")
