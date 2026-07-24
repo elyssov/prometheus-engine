@@ -11,10 +11,10 @@
 // cycle, swiping paws and a curling tail.
 // ═══════════════════════════════════════════════════════════════
 
-use glam::{Mat4, Quat, Vec3};
-use super::skeleton::{Skeleton, BoneId};
-use super::meshing::{ChunkMesh, MeshVertex};
 use super::damage::{self, Damage, Durability, HitResult};
+use super::meshing::{ChunkMesh, MeshVertex};
+use super::skeleton::{BoneId, Skeleton};
+use glam::{Mat4, Quat, Vec3};
 
 /// One oriented box. Authoring is done in local space; the world
 /// transform is computed each frame from the bone (if attached).
@@ -29,6 +29,9 @@ pub struct Brick {
     pub color: [u8; 3],
     /// Engine material id (passed through to mesh)
     pub material: u8,
+    /// Optional local-space chamfer width. Zero keeps the destructive-world
+    /// box path cheap; authored hero assets can opt into polished edges.
+    pub bevel: f32,
 
     // ── Skeleton attachment ─────────────────────────────────
     /// Bone this brick rides on (None = world-space static)
@@ -60,7 +63,10 @@ impl Brick {
     pub fn new(name: &str, half_extents: Vec3, color: [u8; 3]) -> Self {
         Self {
             name: name.to_string(),
-            half_extents, color, material: 5,
+            half_extents,
+            color,
+            material: 5,
+            bevel: 0.0,
             parent: None,
             local_offset: Vec3::ZERO,
             local_rotation: Quat::IDENTITY,
@@ -75,20 +81,21 @@ impl Brick {
     }
 
     pub fn with_durability(mut self, d: Durability) -> Self {
-        self.durability = Some(d); self
+        self.durability = Some(d);
+        self
     }
 
     /// Tinted color used for rendering (flash after damage).
     fn render_color(&self) -> [u8; 3] {
-        if self.flash_t <= 0.0 { return self.color; }
+        if self.flash_t <= 0.0 {
+            return self.color;
+        }
         let f = (self.flash_t / 0.35).clamp(0.0, 1.0);
-        let lerp = |a: u8, b: u8| -> u8 {
-            (a as f32 * (1.0 - f) + b as f32 * f) as u8
-        };
+        let lerp = |a: u8, b: u8| -> u8 { (a as f32 * (1.0 - f) + b as f32 * f) as u8 };
         [
             lerp(self.color[0], 255),
-            lerp(self.color[1],  60),
-            lerp(self.color[2],  55),
+            lerp(self.color[1], 60),
+            lerp(self.color[2], 55),
         ]
     }
 
@@ -99,6 +106,11 @@ impl Brick {
 
     pub fn with_rotation(mut self, r: Quat) -> Self {
         self.local_rotation = r;
+        self
+    }
+
+    pub fn with_bevel(mut self, width: f32) -> Self {
+        self.bevel = width.max(0.0);
         self
     }
 
@@ -126,7 +138,8 @@ pub struct BrickModel {
 impl BrickModel {
     pub fn new(name: &str) -> Self {
         Self {
-            name: name.to_string(), bricks: Vec::new(),
+            name: name.to_string(),
+            bricks: Vec::new(),
             root_position: Vec3::ZERO,
             root_rotation: Quat::IDENTITY,
         }
@@ -166,8 +179,11 @@ impl BrickModel {
         let root_p = self.root_position;
         let root_r = self.root_rotation;
         for b in self.bricks.iter_mut() {
-            assert!(b.parent.is_none(),
-                "update_static called on model containing bone-attached brick '{}'", b.name);
+            assert!(
+                b.parent.is_none(),
+                "update_static called on model containing bone-attached brick '{}'",
+                b.name
+            );
             b.world_rotation = root_r * b.local_rotation;
             b.world_position = root_p + root_r * b.local_offset;
         }
@@ -178,13 +194,17 @@ impl BrickModel {
     pub fn to_mesh(&self) -> ChunkMesh {
         let mut mesh = ChunkMesh::new();
         for b in &self.bricks {
-            if !b.visible { continue; }
+            if !b.visible {
+                continue;
+            }
             append_brick(&mut mesh, b);
         }
         mesh
     }
 
-    pub fn brick_count(&self) -> usize { self.bricks.len() }
+    pub fn brick_count(&self) -> usize {
+        self.bricks.len()
+    }
 
     /// Decrement flash timers; call once per frame.
     pub fn tick_flash(&mut self, dt: f32) {
@@ -197,12 +217,21 @@ impl BrickModel {
 
     /// Raycast against all VISIBLE, BREAKABLE bricks' world-space AABBs.
     /// Returns (brick_index, distance_along_ray) of the nearest hit within `max_dist`.
-    pub fn raycast_breakable(&self, origin: Vec3, dir: Vec3, max_dist: f32) -> Option<(usize, f32)> {
+    pub fn raycast_breakable(
+        &self,
+        origin: Vec3,
+        dir: Vec3,
+        max_dist: f32,
+    ) -> Option<(usize, f32)> {
         let dir = dir.normalize_or_zero();
-        if dir.length_squared() < 1e-6 { return None; }
+        if dir.length_squared() < 1e-6 {
+            return None;
+        }
         let mut best: Option<(usize, f32)> = None;
         for (i, b) in self.bricks.iter().enumerate() {
-            if !b.visible || b.durability.is_none() { continue; }
+            if !b.visible || b.durability.is_none() {
+                continue;
+            }
             let he = Vec3::new(
                 b.half_extents.x * b.scale.x,
                 b.half_extents.y * b.scale.y,
@@ -225,8 +254,12 @@ impl BrickModel {
         let b = &mut self.bricks[idx];
         let dur = b.durability.as_mut()?;
         let hit = damage::apply_hit(dur, dmg);
-        if hit.applied { b.flash_t = 0.35; }
-        if hit.broken  { b.visible = false; }
+        if hit.applied {
+            b.flash_t = 0.35;
+        }
+        if hit.broken {
+            b.visible = false;
+        }
         Some(hit)
     }
 }
@@ -256,38 +289,73 @@ fn ray_aabb(origin: Vec3, dir: Vec3, min: Vec3, max: Vec3, max_dist: f32) -> Opt
 /// Corner offsets are unit cube corners relative to face — multiplied by half_extents.
 const FACES: [(Vec3, [Vec3; 4]); 6] = [
     // +X
-    (Vec3::X, [
-        Vec3::new( 1.0, -1.0, -1.0), Vec3::new( 1.0,  1.0, -1.0),
-        Vec3::new( 1.0,  1.0,  1.0), Vec3::new( 1.0, -1.0,  1.0),
-    ]),
+    (
+        Vec3::X,
+        [
+            Vec3::new(1.0, -1.0, -1.0),
+            Vec3::new(1.0, 1.0, -1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(1.0, -1.0, 1.0),
+        ],
+    ),
     // -X
-    (Vec3::NEG_X, [
-        Vec3::new(-1.0, -1.0,  1.0), Vec3::new(-1.0,  1.0,  1.0),
-        Vec3::new(-1.0,  1.0, -1.0), Vec3::new(-1.0, -1.0, -1.0),
-    ]),
+    (
+        Vec3::NEG_X,
+        [
+            Vec3::new(-1.0, -1.0, 1.0),
+            Vec3::new(-1.0, 1.0, 1.0),
+            Vec3::new(-1.0, 1.0, -1.0),
+            Vec3::new(-1.0, -1.0, -1.0),
+        ],
+    ),
     // +Y
-    (Vec3::Y, [
-        Vec3::new(-1.0,  1.0, -1.0), Vec3::new(-1.0,  1.0,  1.0),
-        Vec3::new( 1.0,  1.0,  1.0), Vec3::new( 1.0,  1.0, -1.0),
-    ]),
+    (
+        Vec3::Y,
+        [
+            Vec3::new(-1.0, 1.0, -1.0),
+            Vec3::new(-1.0, 1.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(1.0, 1.0, -1.0),
+        ],
+    ),
     // -Y
-    (Vec3::NEG_Y, [
-        Vec3::new(-1.0, -1.0,  1.0), Vec3::new(-1.0, -1.0, -1.0),
-        Vec3::new( 1.0, -1.0, -1.0), Vec3::new( 1.0, -1.0,  1.0),
-    ]),
+    (
+        Vec3::NEG_Y,
+        [
+            Vec3::new(-1.0, -1.0, 1.0),
+            Vec3::new(-1.0, -1.0, -1.0),
+            Vec3::new(1.0, -1.0, -1.0),
+            Vec3::new(1.0, -1.0, 1.0),
+        ],
+    ),
     // +Z
-    (Vec3::Z, [
-        Vec3::new( 1.0, -1.0,  1.0), Vec3::new( 1.0,  1.0,  1.0),
-        Vec3::new(-1.0,  1.0,  1.0), Vec3::new(-1.0, -1.0,  1.0),
-    ]),
+    (
+        Vec3::Z,
+        [
+            Vec3::new(1.0, -1.0, 1.0),
+            Vec3::new(1.0, 1.0, 1.0),
+            Vec3::new(-1.0, 1.0, 1.0),
+            Vec3::new(-1.0, -1.0, 1.0),
+        ],
+    ),
     // -Z
-    (Vec3::NEG_Z, [
-        Vec3::new(-1.0, -1.0, -1.0), Vec3::new(-1.0,  1.0, -1.0),
-        Vec3::new( 1.0,  1.0, -1.0), Vec3::new( 1.0, -1.0, -1.0),
-    ]),
+    (
+        Vec3::NEG_Z,
+        [
+            Vec3::new(-1.0, -1.0, -1.0),
+            Vec3::new(-1.0, 1.0, -1.0),
+            Vec3::new(1.0, 1.0, -1.0),
+            Vec3::new(1.0, -1.0, -1.0),
+        ],
+    ),
 ];
 
 fn append_brick(mesh: &mut ChunkMesh, b: &Brick) {
+    if b.bevel > 0.0 {
+        append_beveled_brick(mesh, b);
+        return;
+    }
+
     let xform = b.world_transform();
     let normal_xform = b.world_rotation; // rotate normals only (no scale/translation)
     let rc = b.render_color();
@@ -327,6 +395,130 @@ fn append_brick(mesh: &mut ChunkMesh, b: &Brick) {
     }
 }
 
+fn append_beveled_brick(mesh: &mut ChunkMesh, b: &Brick) {
+    let xform = b.world_transform();
+    let normal_xform = b.world_rotation;
+    let rc = b.render_color();
+    let color = [
+        rc[0] as f32 / 255.0,
+        rc[1] as f32 / 255.0,
+        rc[2] as f32 / 255.0,
+        1.0,
+    ];
+    let h = b.half_extents;
+    let bevel = b.bevel.min(h.min_element() * 0.45);
+    let inner = h - Vec3::splat(bevel);
+
+    let mut push_quad = |points: [Vec3; 4], local_normal: Vec3| {
+        let normal_v = normal_xform * local_normal.normalize();
+        let normal = [normal_v.x, normal_v.y, normal_v.z];
+        let base = mesh.vertices.len() as u32;
+        for point in points {
+            let world = xform.transform_point3(point);
+            mesh.vertices.push(MeshVertex {
+                position: [world.x, world.y, world.z],
+                normal,
+                color,
+                material: b.material,
+            });
+        }
+        mesh.indices
+            .extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
+        mesh.triangle_count += 2;
+    };
+
+    // Six inset planar faces.
+    for (normal, corners) in FACES {
+        let points = corners.map(|corner| {
+            Vec3::new(
+                if normal.x != 0.0 {
+                    normal.x * h.x
+                } else {
+                    corner.x * inner.x
+                },
+                if normal.y != 0.0 {
+                    normal.y * h.y
+                } else {
+                    corner.y * inner.y
+                },
+                if normal.z != 0.0 {
+                    normal.z * h.z
+                } else {
+                    corner.z * inner.z
+                },
+            )
+        });
+        push_quad(points, normal);
+    }
+
+    // Twelve edge strips.
+    for sy in [-1.0_f32, 1.0] {
+        for sz in [-1.0_f32, 1.0] {
+            push_quad(
+                [
+                    Vec3::new(-inner.x, sy * h.y, sz * inner.z),
+                    Vec3::new(inner.x, sy * h.y, sz * inner.z),
+                    Vec3::new(inner.x, sy * inner.y, sz * h.z),
+                    Vec3::new(-inner.x, sy * inner.y, sz * h.z),
+                ],
+                Vec3::new(0.0, sy, sz),
+            );
+        }
+    }
+    for sx in [-1.0_f32, 1.0] {
+        for sz in [-1.0_f32, 1.0] {
+            push_quad(
+                [
+                    Vec3::new(sx * h.x, -inner.y, sz * inner.z),
+                    Vec3::new(sx * h.x, inner.y, sz * inner.z),
+                    Vec3::new(sx * inner.x, inner.y, sz * h.z),
+                    Vec3::new(sx * inner.x, -inner.y, sz * h.z),
+                ],
+                Vec3::new(sx, 0.0, sz),
+            );
+        }
+    }
+    for sx in [-1.0_f32, 1.0] {
+        for sy in [-1.0_f32, 1.0] {
+            push_quad(
+                [
+                    Vec3::new(sx * h.x, sy * inner.y, -inner.z),
+                    Vec3::new(sx * h.x, sy * inner.y, inner.z),
+                    Vec3::new(sx * inner.x, sy * h.y, inner.z),
+                    Vec3::new(sx * inner.x, sy * h.y, -inner.z),
+                ],
+                Vec3::new(sx, sy, 0.0),
+            );
+        }
+    }
+
+    // Eight triangular corner caps.
+    for sx in [-1.0_f32, 1.0] {
+        for sy in [-1.0_f32, 1.0] {
+            for sz in [-1.0_f32, 1.0] {
+                let normal_v = normal_xform * Vec3::new(sx, sy, sz).normalize();
+                let normal = [normal_v.x, normal_v.y, normal_v.z];
+                let base = mesh.vertices.len() as u32;
+                for point in [
+                    Vec3::new(sx * h.x, sy * inner.y, sz * inner.z),
+                    Vec3::new(sx * inner.x, sy * h.y, sz * inner.z),
+                    Vec3::new(sx * inner.x, sy * inner.y, sz * h.z),
+                ] {
+                    let world = xform.transform_point3(point);
+                    mesh.vertices.push(MeshVertex {
+                        position: [world.x, world.y, world.z],
+                        normal,
+                        color,
+                        material: b.material,
+                    });
+                }
+                mesh.indices.extend_from_slice(&[base, base + 1, base + 2]);
+                mesh.triangle_count += 1;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -344,6 +536,17 @@ mod tests {
     }
 
     #[test]
+    fn beveled_brick_adds_face_edge_and_corner_geometry() {
+        let mut model = BrickModel::new("beveled");
+        model.add(Brick::new("cube", Vec3::splat(1.0), [255, 128, 32]).with_bevel(0.15));
+        let skeleton = Skeleton::new("root");
+        model.update(&skeleton);
+        let mesh = model.to_mesh();
+        assert_eq!(mesh.triangle_count, 44);
+        assert_eq!(mesh.vertices.len(), 96);
+    }
+
+    #[test]
     fn rotated_brick_changes_normal() {
         let mut m = BrickModel::new("test");
         let mut b = Brick::new("cube", Vec3::splat(1.0), [255, 0, 0]);
@@ -354,27 +557,37 @@ mod tests {
         let mesh = m.to_mesh();
         // After 90° Z rotation, the +X face's normal should point +Y
         let first_normal = Vec3::from(mesh.vertices[0].normal);
-        assert!((first_normal - Vec3::Y).length() < 0.01,
-            "Expected +Y normal after Z-rotation, got {:?}", first_normal);
+        assert!(
+            (first_normal - Vec3::Y).length() < 0.01,
+            "Expected +Y normal after Z-rotation, got {:?}",
+            first_normal
+        );
     }
 
     #[test]
     fn brick_attached_to_bone_follows_it() {
         let mut sk = Skeleton::new("root");
-        sk.add_bone("arm", "root", 5.0, Vec3::X,
-            crate::core::skeleton::JointConstraint::Free);
+        sk.add_bone(
+            "arm",
+            "root",
+            5.0,
+            Vec3::X,
+            crate::core::skeleton::JointConstraint::Free,
+        );
         sk.root_position = Vec3::new(10.0, 20.0, 30.0);
         sk.solve_forward();
         let arm_id = sk.bone("arm").id;
 
         let mut m = BrickModel::new("test");
-        let b = Brick::new("attached", Vec3::splat(1.0), [0, 255, 0])
-            .attached_to(arm_id);
+        let b = Brick::new("attached", Vec3::splat(1.0), [0, 255, 0]).attached_to(arm_id);
         m.add(b);
         m.update(&sk);
         // Brick should be at the arm bone's joint (which sits at root)
         let p = m.bricks[0].world_position;
-        assert!((p - Vec3::new(10.0, 20.0, 30.0)).length() < 0.01,
-            "Brick should be at arm's joint position, got {:?}", p);
+        assert!(
+            (p - Vec3::new(10.0, 20.0, 30.0)).length() < 0.01,
+            "Brick should be at arm's joint position, got {:?}",
+            p
+        );
     }
 }
